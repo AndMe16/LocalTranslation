@@ -115,7 +115,7 @@ namespace LocalTranslation.src
         private void Update()
         {
             // Check if the user has toggled the local translation mode
-            if (Input.GetKeyDown(KeyCode.L) && isModEnabled) // Change to your desired key
+            if (Input.GetKeyDown(ModConfig.toggleMode.Value) && isModEnabled)
             {
                 useLocalMode = !useLocalMode;
                 Logger.LogInfo($"Local Translation Mode: {(useLocalMode ? "Enabled" : "Disabled")}");
@@ -225,12 +225,11 @@ namespace LocalTranslation.src
     [HarmonyPatch(typeof(LEV_GizmoHandler), "DragGizmo")]
     class Patch_DragGizmo_LocalTranslation
     {
-
-        internal static Vector3 lastMousePos;
         internal static Vector3? lastAxisPoint;
 
-        static List<string> planeNames = ["XY", "YZ", "XZ"];
-        static List<string> axisNames = ["X", "Y", "Z"];
+        static readonly List<string> planeNames = ["XY", "YZ", "XZ"];
+        static readonly List<string> axisNames = ["X", "Y", "Z"];
+
 
         static bool Prefix(LEV_GizmoHandler __instance)
         {
@@ -328,13 +327,36 @@ namespace LocalTranslation.src
                 }
 
                 Vector3 moveDir = closestPoint - lastAxisPoint.Value;
-                lastAxisPoint = closestPoint;
 
-                // Apply movement
-                foreach (var obj in selectionList)
-                    obj.transform.position += moveDir;
+                float gridStep = gizmoTransform.name.Contains("Y") ? __instance.gridY : __instance.gridXZ;
+                float distance = moveDir.magnitude;
 
-                __instance.motherGizmo.transform.position += moveDir;
+                // If the movement exceeds the grid step, apply only the largest full step
+                if (distance >= gridStep*0.5)
+                {
+                    Vector3 direction = moveDir.normalized;
+
+                    float snappedDistance = 0;
+                    if (gridStep > 0f)
+                    {
+                        snappedDistance = Mathf.Floor(distance / gridStep) * gridStep;
+                    }
+                    else
+                    {
+                        snappedDistance = distance; // No grid snapping, use actual distance
+                    }
+
+                    Vector3 snappedMove = direction * snappedDistance;
+
+                    // Apply movement
+                    foreach (var obj in selectionList)
+                        obj.transform.position += snappedMove;
+
+                    __instance.motherGizmo.transform.position += snappedMove;
+
+                    // Advance lastAxisPoint by how far we actually moved
+                    lastAxisPoint = lastAxisPoint.Value + snappedMove;
+                }
 
                 return false;
             }
