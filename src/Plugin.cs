@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 
 namespace LocalTranslation.src
 { // will be replaced by assemblyName if desired
-    [BepInPlugin("andme123.localtranslation", "LocalTranslation", "1.0.0")]
+    [BepInPlugin("andme123.localtranslation", "LocalTranslation", MyPluginInfo.PLUGIN_VERSION)]
     public class Plugin : BaseUnityPlugin
     {
         internal static ManualLogSource logger;
