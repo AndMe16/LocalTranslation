@@ -5,7 +5,10 @@ using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+using TMPro;
 
 namespace LocalTranslation.src
 { // will be replaced by assemblyName if desired
@@ -17,10 +20,25 @@ namespace LocalTranslation.src
 
         internal bool isModEnabled = false;
         internal LEV_LevelEditorCentral levelEditorCentral;
+        internal LEV_RotateFlip rotateFlip;
         internal bool useLocalMode = false;
+
+        Sprite[] allSprites;
+
+        readonly string[] spritesStr = ["Pivot_LastSelected", "Pivot_Average", "Pivot_ToggleOff_NonDefault", "Pivot_ToggleOn_NonDefault"];
+        Dictionary<string,Sprite> sprites = new Dictionary<string, Sprite>();
 
         // Only patch the LevelEditor2 scene
         private const string TargetSceneName = "LevelEditor2";
+
+        GameObject baseButton;
+        internal GameObject toggleLocalTranslationButton;
+        Image toggleLocalTranslationImage;
+
+        GameObject baseLabel;
+        internal GameObject toggleLabel;
+
+        LEV_CustomButton customButton;
 
         public static Plugin Instance { get; private set; }
 
@@ -58,14 +76,117 @@ namespace LocalTranslation.src
                     Logger.LogError("LEV_LevelEditorCentral not found in the Level Editor scene.");
                     return;
                 }
+
+                baseButton = GameObject.Find("Level Editor Central/Canvas/GameView/Gizmo Mode (true)--------------/_Top Right/Global Rotation Toggle");
+
+                if (baseButton == null)
+                {
+                    Logger.LogError("Base button for toggling global/local mode not found.");
+                    return;
+                }
+
+                rotateFlip = levelEditorCentral.GetComponentInChildren<LEV_RotateFlip>();
+
+                if (rotateFlip == null)
+                {
+                    Logger.LogError("LEV_RotateFlip component not found in Level Editor Central.");
+                    return;
+                }
+
+                baseLabel = GameObject.Find("Level Editor Central/Canvas/GameView/Gizmo Mode (true)--------------/_Top Right/Global Rotation Label");
+                if (baseLabel == null)
+                {
+                    Logger.LogError("Base label for toggling global/local mode not found.");
+                    return;
+                }
+
+                CreateToggleLocalModeButton();
+
                 isModEnabled = true;
                 // Logger.LogInfo("Level Editor scene loaded — mod activated.");
             }
             else
             {
                 isModEnabled = false;
+                useLocalMode = false; // Reset local mode when not in Level Editor scene
+                toggleLocalTranslationButton?.SetActive(false); // Hide the button when not in Level Editor scene
+                toggleLabel?.SetActive(false);
+                toggleLocalTranslationImage = null; // Reset the image reference
                 // Logger.LogInfo("Not in the Level Editor scene — mod inactive.");
             }
+        }
+
+        private void CreateToggleLocalModeButton()
+        {
+            if (toggleLocalTranslationButton == null)
+            {
+                toggleLocalTranslationButton = GameObject.Instantiate(baseButton, baseButton.transform.parent);
+            }
+
+            toggleLocalTranslationButton.name = "Local Translation Toggle";
+
+            toggleLocalTranslationImage = toggleLocalTranslationButton.transform.GetChild(0).gameObject.GetComponent<Image>();
+
+            if (toggleLocalTranslationImage == null)
+            {
+                Logger.LogError("Global Rotation Toggle button image not found.");
+                return;
+            }
+
+            // Now access the LEV_CustomButton component
+            customButton = toggleLocalTranslationButton.GetComponent<LEV_CustomButton>();
+
+            if (customButton != null)
+            {
+                // Add a click listener
+                customButton.onClick = new UnityEvent(); // clears all listeners
+                customButton.onClick.AddListener(() => {
+                    Logger.LogInfo("Toggling Local Translation Mode.");
+
+                    useLocalMode = !useLocalMode;
+
+                    SetRotationToLocalMode();
+                });
+            }
+
+            Destroy(toggleLocalTranslationButton.GetComponent<LEV_HotkeyButton>());
+
+            if (allSprites == null || allSprites?.Length == 0)
+            {
+                allSprites = Resources.FindObjectsOfTypeAll<Sprite>();
+            }
+            
+            foreach (var sprite in allSprites)
+            {
+                if (spritesStr.Contains(sprite.name))
+                {
+                    sprites.Add(sprite.name, sprite);
+                }
+            }
+
+            if (!useLocalMode)
+            {
+                toggleLocalTranslationImage.sprite = sprites["Pivot_Average"];
+            }
+            else
+            {
+                toggleLocalTranslationImage.sprite = sprites["Pivot_LastSelected"];
+            }
+
+
+                toggleLocalTranslationButton.SetActive(false); 
+
+            if (toggleLabel == null)
+            {
+                toggleLabel = GameObject.Instantiate(baseLabel, baseLabel.transform.parent);
+            }
+
+            toggleLabel.name = "Local Translation Label";
+
+            toggleLabel.GetComponent<TextMeshProUGUI>().text = "Global Translation";
+
+            toggleLabel.SetActive(false);
+
         }
 
         internal void SetRotationToLocalMode()
@@ -96,13 +217,19 @@ namespace LocalTranslation.src
                     var selectedTransform = selection_list[^1].transform;
                     // Set gizmos to local mode based on the selected object's transform
                     translationGizmos.transform.localRotation = selectedTransform.rotation; // Use the selected object's rotation
+
+                    toggleLocalTranslationImage.sprite = sprites["Pivot_LastSelected"];
+
                     // Logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
-                    
+
                 }
                 else
                 {
                     // Set gizmos to world mode
                     translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0); // Reset rotation to world space
+
+                    toggleLocalTranslationImage.sprite = sprites["Pivot_Average"]; 
+
                     // Logger.LogInfo("TranslationGizmos set to world mode.");
                 }
             }
@@ -132,16 +259,38 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
             {
                 Plugin.Instance.SetRotationToLocalMode();
+            }
+            if (Plugin.Instance.isModEnabled)
+            {
+                Plugin.Instance.toggleLocalTranslationButton.SetActive(true);
+                Plugin.Instance.toggleLabel.SetActive(true);
+            }
+                
+        }
+    }
+
+    // SelectRotate
+    [HarmonyPatch(typeof(LEV_GizmoHandler), "SelectRotate")]
+    class Patch_SelectRotate_LocalTranslation
+    {
+        static void Postfix(LEV_GizmoHandler __instance)
+        {
+            if (Plugin.Instance.isModEnabled)
+            {
+                Plugin.Instance.toggleLocalTranslationButton.SetActive(false);
+                Plugin.Instance.toggleLabel.SetActive(false);
             }
         }
     }
 
     // ResetRotation
     [HarmonyPatch(typeof(LEV_GizmoHandler), "ResetRotation")]
-    class Patch_SelectDrag_LocalRotation {
+    class Patch_ResetRotation_LocalRotation
+    {
         static void Postfix(LEV_GizmoHandler __instance)
         {
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
@@ -195,7 +344,7 @@ namespace LocalTranslation.src
         }
     }
 
-    // GoIntoGMode
+    // Deactivate
     [HarmonyPatch(typeof(LEV_GizmoHandler), "Deactivate")]
     class Patch_Deactivate_LocalTranslation
     {
@@ -332,7 +481,7 @@ namespace LocalTranslation.src
                 float distance = moveDir.magnitude;
 
                 // If the movement exceeds the grid step, apply only the largest full step
-                if (distance >= gridStep*0.5)
+                if (distance >= gridStep*0.5f)
                 {
                     Vector3 direction = moveDir.normalized;
 
