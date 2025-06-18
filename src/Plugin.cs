@@ -4,11 +4,11 @@ using BepInEx.Logging;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using TMPro;
 
 namespace LocalTranslation.src
 { // will be replaced by assemblyName if desired
@@ -27,6 +27,8 @@ namespace LocalTranslation.src
 
         readonly string[] spritesStr = ["Pivot_LastSelected", "Pivot_Average", "Pivot_ToggleOff_NonDefault", "Pivot_ToggleOn_NonDefault"];
         Dictionary<string,Sprite> sprites = new Dictionary<string, Sprite>();
+        internal static readonly Color NormalColor = new Color(1f, 0.572549f, 0f, 1f);
+        internal static readonly Color WarningColor = new Color(0.988f, 0.27f, 0f, 1f); // light red
 
         // Only patch the LevelEditor2 scene
         private const string TargetSceneName = "LevelEditor2";
@@ -38,7 +40,7 @@ namespace LocalTranslation.src
         GameObject baseLabel;
         internal GameObject toggleLabel;
 
-        LEV_CustomButton customButton;
+        internal LEV_CustomButton customButton;
 
         public static Plugin Instance { get; private set; }
 
@@ -241,14 +243,16 @@ namespace LocalTranslation.src
 
         private void Update()
         {
+
+            if (!isModEnabled) return;
+
             // Check if the user has toggled the local translation mode
-            if (Input.GetKeyDown(ModConfig.toggleMode.Value) && isModEnabled)
+            if (Input.GetKeyDown(ModConfig.toggleMode.Value))
             {
                 useLocalMode = !useLocalMode;
                 Logger.LogInfo($"Local Translation Mode: {(useLocalMode ? "Enabled" : "Disabled")}");
 
                 SetRotationToLocalMode();
-
             }
         }
     }
@@ -488,7 +492,7 @@ namespace LocalTranslation.src
                     float snappedDistance = 0;
                     if (gridStep > 0f)
                     {
-                        snappedDistance = Mathf.Floor(distance / gridStep) * gridStep;
+                        snappedDistance = gridStep;
                     }
                     else
                     {
@@ -568,7 +572,111 @@ namespace LocalTranslation.src
             return p1 + d1 * s;
         }
 
+        [HarmonyPatch(typeof(LEV_MotherGizmoFlipper), "Update")]
+        public class TranslationGizmo_Update_Patch
+        {
+            static bool Prefix(LEV_MotherGizmoFlipper __instance)
+            {
+                if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) return true;
+
+                if (__instance.central.gizmos.isDragging)
+                    return false;
+
+                Transform t = __instance.t;
+                Transform camTransform = __instance.central.cam.cameraTransform;
+                Transform xyzFlip = __instance.xyzFlip;
+
+                Vector3 localCamPos = t.InverseTransformPoint(camTransform.position);
+                xyzFlip.localScale = new Vector3(
+                    Mathf.Sign(localCamPos.x),
+                    Mathf.Sign(localCamPos.y),
+                    Mathf.Sign(localCamPos.z)
+                );
+
+                return false; // Skip original Update logic
+            }
+        }
     }
+
+    [HarmonyPatch(typeof(LEV_GizmoHandler), "DisableGizmosOnDistance")]
+    public static class TranslationGizmo_DisablePatch
+    {
+        static bool Prefix(LEV_GizmoHandler __instance)
+        {
+            if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) return true;
+
+            Transform camTransform = Camera.main.transform;
+            Transform gizmoRoot = __instance.translationGizmos.transform;
+
+            // Calculate view direction in local gizmo space
+            Vector3 localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) - gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
+
+            // Thresholds
+            const float axisDotThreshold = 0.98f;     // axis disappears if view is almost parallel to axis
+            const float planeDotThreshold = 0.05f;     // plane disappears if view is nearly perpendicular to plane
+
+            // Axis gizmos: disable if camera is looking *along* the axis
+            SetGizmoActive(__instance.Xgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) < axisDotThreshold);
+            SetGizmoActive(__instance.Ygizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) < axisDotThreshold);
+            SetGizmoActive(__instance.Zgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.forward)) < axisDotThreshold);
+
+            // Plane gizmos: disable if camera is looking *edge-on* to the plane (aligned with the plane's normal)
+            SetGizmoActive(__instance.XYgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.forward)) > planeDotThreshold); // Z normal
+            SetGizmoActive(__instance.YZgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) > planeDotThreshold);  // X normal
+            SetGizmoActive(__instance.XZgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) > planeDotThreshold);     // Y normal
+
+            // Keep rotation gizmo logic as-is, based on original distance system
+            __instance.DisableOrNotIndividualGizmo(__instance.RXgizmo, __instance.RXdist);
+            __instance.DisableOrNotIndividualGizmo(__instance.RYgizmo, __instance.RYdist);
+            __instance.DisableOrNotIndividualGizmo(__instance.RZgizmo, __instance.RZdist);
+
+            return false; // skip original method
+        }
+
+        private static void SetGizmoActive(LEV_SingleGizmo gizmo, bool active)
+        {
+            if (gizmo == null) return;
+
+            if (active && !gizmo.gameObject.activeSelf)
+            {
+                gizmo.gameObject.SetActive(true);
+            }
+            else if (!active && gizmo.gameObject.activeSelf)
+            {
+                gizmo.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(LEV_CustomButton), "SetToDefaultColor")]
+    public static class CustomButton_SetToDefaultColor_Patch
+    {
+        static void Postfix(LEV_CustomButton __instance)
+        {
+            if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) return;
+
+            // Only apply the warning logic to the specific button you care about
+            if (__instance != Plugin.Instance.customButton)
+                return;
+
+            var selection_list = Plugin.Instance.levelEditorCentral?.selection?.list;
+
+            if (selection_list.Count == 0) return; // No objects selected
+
+            // Get the last selected object's transform
+            var selectedBlock = selection_list[^1];
+
+            if (selectedBlock == null || Plugin.Instance.customButton == null) return;
+
+            // Compare rotation against global alignment
+            Quaternion blockRot = selectedBlock.transform.rotation;
+            bool isAligned = Quaternion.Angle(blockRot, Quaternion.identity) < 1f;
+
+            Plugin.Instance.customButton.buttonImage.color = isAligned ? Plugin.NormalColor : Plugin.WarningColor;
+        }
+    }
+
+
 
     public class ModConfig : MonoBehaviour
     {
