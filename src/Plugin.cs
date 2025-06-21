@@ -2,6 +2,7 @@
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -55,7 +56,17 @@ namespace LocalTranslation.src
             logger.LogInfo("Plugin andme123.localtranslation is loaded!");
 
             ModConfig.Initialize(Config);
-            SceneManager.sceneLoaded += OnSceneLoaded;
+            SceneManager.sceneLoaded += (scene, mode) =>
+            {
+                try
+                {
+                    OnSceneLoaded(scene, mode);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"OnSceneLoaded exception: {ex}");
+                }
+            };
 
         }
 
@@ -111,9 +122,11 @@ namespace LocalTranslation.src
             {
                 isModEnabled = false;
                 useLocalMode = false; // Reset local mode when not in Level Editor scene
-                toggleLocalTranslationButton?.SetActive(false); // Hide the button when not in Level Editor scene
-                toggleLabel?.SetActive(false);
-                toggleLocalTranslationImage = null; // Reset the image reference
+                toggleLocalTranslationButton = null;
+                toggleLocalTranslationImage = null;
+                customButton = null;
+                toggleLabel = null;
+
                 // Logger.LogInfo("Not in the Level Editor scene — mod inactive.");
             }
         }
@@ -156,15 +169,19 @@ namespace LocalTranslation.src
             if (allSprites == null || allSprites?.Length == 0)
             {
                 allSprites = Resources.FindObjectsOfTypeAll<Sprite>();
-            }
-            
-            foreach (var sprite in allSprites)
-            {
-                if (spritesStr.Contains(sprite.name))
+                foreach (var sprite in allSprites)
                 {
-                    sprites.Add(sprite.name, sprite);
+                    if (spritesStr.Contains(sprite.name))
+                    {
+                        if (!sprites.ContainsKey(sprite.name))
+                        {
+                            sprites.Add(sprite.name, sprite);
+                        }
+
+                    }
                 }
             }
+            
 
             if (!useLocalMode)
             {
