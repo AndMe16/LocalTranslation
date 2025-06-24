@@ -540,8 +540,8 @@ internal class PatchDragGizmoLocalTranslation
                 return false;
             }
 
-            Plugin.logger.LogWarning(
-                $"Mouse ray did not hit the plane for gizmo {gizmoName} (enter = {enter}). Skipping drag.");
+            // Plugin.logger.LogWarning(
+            //     $"Mouse ray did not hit the plane for gizmo {gizmoName} (enter = {enter}). Skipping drag.");
             return false;
         }
     }
