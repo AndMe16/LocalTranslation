@@ -10,7 +10,6 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-using static UnityEngine.UI.Image;
 
 namespace LocalTranslation.src
 { // will be replaced by assemblyName if desired
@@ -28,9 +27,9 @@ namespace LocalTranslation.src
         Sprite[] allSprites;
 
         readonly string[] spritesStr = ["Pivot_LastSelected", "Pivot_Average", "Pivot_ToggleOff_NonDefault", "Pivot_ToggleOn_NonDefault"];
-        Dictionary<string,Sprite> sprites = new Dictionary<string, Sprite>();
-        internal static readonly Color NormalColor = new Color(1f, 0.572549f, 0f, 1f);
-        internal static readonly Color WarningColor = new Color(0.988f, 0.27f, 0f, 1f); // light red
+        readonly Dictionary<string, Sprite> sprites = [];
+        internal static readonly Color NormalColor = new(1f, 0.572549f, 0f, 1f);
+        internal static readonly Color WarningColor = new(0.988f, 0.27f, 0f, 1f); // light red
 
         // Only patch the LevelEditor2 scene
         private const string TargetSceneName = "LevelEditor2";
@@ -156,7 +155,8 @@ namespace LocalTranslation.src
             {
                 // Add a click listener
                 customButton.onClick = new UnityEvent(); // clears all listeners
-                customButton.onClick.AddListener(() => {
+                customButton.onClick.AddListener(() =>
+                {
                     Logger.LogInfo("Toggling Local Translation Mode.");
 
                     useLocalMode = !useLocalMode;
@@ -182,7 +182,7 @@ namespace LocalTranslation.src
                     }
                 }
             }
-            
+
 
             if (!useLocalMode)
             {
@@ -194,7 +194,7 @@ namespace LocalTranslation.src
             }
 
 
-                toggleLocalTranslationButton.SetActive(false); 
+            toggleLocalTranslationButton.SetActive(false);
 
             if (toggleLabel == null)
             {
@@ -232,7 +232,7 @@ namespace LocalTranslation.src
                     {
                         // Logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
                     }
-                    
+
                     // Get the last selected object's transform
                     var selectedTransform = selection_list[^1].transform;
                     // Set gizmos to local mode based on the selected object's transform
@@ -248,7 +248,7 @@ namespace LocalTranslation.src
                     // Set gizmos to world mode
                     translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0); // Reset rotation to world space
 
-                    toggleLocalTranslationImage.sprite = sprites["Pivot_Average"]; 
+                    toggleLocalTranslationImage.sprite = sprites["Pivot_Average"];
 
                     // Logger.LogInfo("TranslationGizmos set to world mode.");
                 }
@@ -281,6 +281,10 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
 
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
             {
@@ -291,7 +295,7 @@ namespace LocalTranslation.src
                 Plugin.Instance.toggleLocalTranslationButton.SetActive(true);
                 Plugin.Instance.toggleLabel.SetActive(true);
             }
-                
+
         }
     }
 
@@ -301,6 +305,11 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
+
             if (Plugin.Instance.isModEnabled)
             {
                 Plugin.Instance.toggleLocalTranslationButton.SetActive(false);
@@ -315,6 +324,11 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
+
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
             {
                 Plugin.Instance.SetRotationToLocalMode();
@@ -328,6 +342,11 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
+
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
             {
                 Plugin.Instance.SetRotationToLocalMode();
@@ -341,10 +360,13 @@ namespace LocalTranslation.src
     {
         static void Postfix(LEV_GizmoHandler __instance)
         {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
+
             if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
             {
-                // Plugin.logger.LogInfo($"Starting new drag operation for gizmo {__instance.currentGizmo.name}.");
-
                 // Reset the last mouse position to the current mouse position
                 Patch_DragGizmo_LocalTranslation.lastAxisPoint = null;
 
@@ -360,7 +382,6 @@ namespace LocalTranslation.src
         {
             if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) { return; }
             // Reset translationGizmos rotation
-            // Plugin.logger.LogInfo("Creating new block, resetting translation gizmos rotation to world space.");
             __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
 
         }
@@ -374,7 +395,6 @@ namespace LocalTranslation.src
         {
             if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) { return; }
             // Reset translationGizmos rotation
-            // Plugin.logger.LogInfo("Deactivating gizmo, resetting translation gizmos rotation to world space.");
             __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
         }
     }
@@ -387,7 +407,6 @@ namespace LocalTranslation.src
         {
             if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) { return; }
             // Reset translationGizmos rotation
-            // Plugin.logger.LogInfo("Selected new block, resetting translation gizmos rotation to world space.");
             __instance.central.gizmos.translationGizmos.transform.localRotation = __instance.central.selection.list[^1].transform.localRotation;
         }
     }
@@ -399,22 +418,20 @@ namespace LocalTranslation.src
         internal static Vector3? lastAxisPoint;
         static Vector3? initialDragOffset = Vector3.zero;
 
-        static readonly List<string> planeNames = ["XY", "YZ", "XZ"];
-        static readonly List<string> axisNames = ["X", "Y", "Z"];
+        static readonly List<string> planeNames = ["xy", "yz", "xz"];
+        static readonly List<string> axisNames = ["x", "y", "z"];
 
-        
+        static readonly float maxDistance = 1500f;
 
         static bool Prefix(LEV_GizmoHandler __instance)
         {
-            //Plugin.logger.LogInfo("Local Translation Mode: DragGizmo called.");
-
             if (!Plugin.Instance.useLocalMode || !Plugin.Instance.isModEnabled) return true;
-            
+
             var currentGizmo = __instance.currentGizmo;
             if (currentGizmo == null)
             {
                 Plugin.logger.LogWarning("No current gizmo found during DragGizmo call.");
-                return true;
+                return false;
             }
 
             var selection = Plugin.Instance.levelEditorCentral?.selection;
@@ -422,7 +439,7 @@ namespace LocalTranslation.src
             if (selection == null)
             {
                 Plugin.logger.LogWarning("No selection found during DragGizmo call.");
-                return true;
+                return false;
             }
 
             var selectionList = selection?.list;
@@ -432,41 +449,43 @@ namespace LocalTranslation.src
             if (selectionList.Count == 0)
             {
                 Plugin.logger.LogWarning("No objects selected for local translation.");
-                return true;
+                return false;
             }
-
-            // Plugin.logger.LogInfo($"Current Gizmo: {currentGizmo.name}");
 
             if (currentGizmo.name.Contains("R"))
             {
-                // Plugin.logger.LogInfo("Rotation Gizmo detected, skipping translation handling.");
                 return true;
             }
+
+            string gizmoName = currentGizmo.name.Replace("Gizmo", "").ToLower();
 
             Transform gizmoTransform = currentGizmo.transform;
 
             Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-            // Plane gizmos (XY, YZ, XZ)
-            if (planeNames.Any(gizmoTransform.name.Contains))
+            DragPlane? dragPlane = GetPlaneFromGizmo(lastSelected, mouseRay, gizmoName);
+
+            if (dragPlane == null)
             {
-                DragPlane? dragPlane = GetPlaneFromGizmo(gizmoTransform, lastSelected);
+                //Plugin.logger.LogWarning($"Gizmo {gizmoTransform.name} does not match any DragPlane.");
+                return false;
+            }
 
-                if (dragPlane == null)
+            // Axis gizmos (X, Y, Z)
+
+            if (axisNames.Any(gizmoName.Equals))
+            {
+                if (dragPlane.Value.Plane.Raycast(mouseRay, out float enter) && enter <= maxDistance)
                 {
-                    Plugin.logger.LogWarning($"Gizmo {gizmoTransform.name} does not match any DragPlane.");
-                    return true;
-                }
+                    Vector3? axis = GetTranslationVector(lastSelected, gizmoName);
 
-                Vector3[] axes = { dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized};
+                    if (axis == null)
+                    {
+                        Plugin.logger.LogWarning($"Gizmo {gizmoName} does not have a valid translation vector.");
+                        return false;
+                    }
 
-                Vector3 snappedMove = Vector3.zero;
-
-                
-
-                if (dragPlane.Value.Plane.Raycast(mouseRay, out float hitDist))
-                {
-                    Vector3 hitPoint = mouseRay.GetPoint(hitDist);
+                    Vector3 hitPoint = mouseRay.GetPoint(enter);
 
                     // On initial click, store offset between pivot and where mouse hit the plane
                     if (!lastAxisPoint.HasValue)
@@ -478,86 +497,16 @@ namespace LocalTranslation.src
                         return false; // Don't apply movement on initial click
                     }
 
-                    // Subtract offset from hit to get compensated movement
-                    Vector3 correctedHit = hitPoint - initialDragOffset.Value;
+                    Vector3 localOffset = hitPoint - initialDragOffset.Value;
 
-                    for (int i = 0; i < 2; i++)
-                    {
-                        Vector3 axis = axes[i];
-                        Ray axisRay = new Ray(lastAxisPoint.Value, axis);
+                    Vector3 closestPoint = Vector3.Project(localOffset, axis.Value);
 
-                        Vector3 closestPoint = ClosestPointBetweenLines(axisRay, new Ray(correctedHit, Camera.main.transform.forward));
-                        Vector3 moveDir = closestPoint - lastAxisPoint.Value;
+                    Vector3 moveDir = closestPoint - lastAxisPoint.Value;
 
-                        float gridStep = (gizmoTransform.name.Contains("XY") && i == 1)
-                                         || (gizmoTransform.name.Contains("YZ") && i == 0)
-                                         ? __instance.gridY
-                                         : __instance.gridXZ;
-
-                        float distance = moveDir.magnitude;
-
-                        if (distance >= gridStep * 0.5f)
-                        {
-                            Vector3 direction = moveDir.normalized;
-                            float snappedDistance = gridStep > 0f ? Mathf.Floor(distance / gridStep) * gridStep : distance;
-
-                            snappedMove += direction * snappedDistance;
-                        }
-                    }
-
-                    // Apply movement
-                    foreach (var obj in selectionList)
-                        obj.transform.position += snappedMove;
-
-                    __instance.motherGizmo.transform.position += snappedMove;
-
-                    lastAxisPoint = lastAxisPoint.Value + snappedMove;
-                    return false;
-                }
-
-                // Apply movement
-                foreach (var obj in selectionList)
-                    obj.transform.position += snappedMove;
-
-                __instance.motherGizmo.transform.position += snappedMove;
-
-                // Advance lastAxisPoint by how far we actually moved
-                lastAxisPoint = lastAxisPoint.Value + snappedMove;
-                return false;
-            }
-
-            // Axis gizmos (X, Y, Z)
-            else if (axisNames.Any(gizmoTransform.name.Contains))
-            {
-                Vector3? axis = GetTranslationVector(gizmoTransform, lastSelected);
-                if (axis == null)
-                {
-                    Plugin.logger.LogWarning($"Gizmo {gizmoTransform.name} does not match any axis or plane.");
-                    return true;
-
-                }
-                Ray axisRay = new Ray((Vector3)selectionMiddlePivot, axis.Value);
-
-                Vector3 closestPoint = ClosestPointBetweenLines(axisRay, mouseRay);
-
-                if (!lastAxisPoint.HasValue)
-                {
-                    lastAxisPoint = closestPoint;
-                }
-
-                Vector3 moveDir = closestPoint - lastAxisPoint.Value;
-
-                float gridStep = gizmoTransform.name.Contains("Y") ? __instance.gridY : __instance.gridXZ;
-                float distance = moveDir.magnitude;
-
-                // If the movement exceeds the grid step, apply only the largest full step
-                if (distance >= gridStep*0.5f)
-                {
-                    Vector3 direction = moveDir.normalized;
-
-                    float snappedDistance = gridStep > 0f ? Mathf.Floor(distance / gridStep) * gridStep : distance;
-
-                    Vector3 snappedMove = direction * snappedDistance;
+                    float gridStep = gizmoName.Contains("y") ? __instance.gridY : __instance.gridXZ;
+                    float distance = Vector3.Dot(moveDir, axis.Value);
+                    float snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
+                    Vector3 snappedMove = axis.Value * snappedDistance;
 
                     // Apply movement
                     foreach (var obj in selectionList)
@@ -567,17 +516,72 @@ namespace LocalTranslation.src
 
                     // Advance lastAxisPoint by how far we actually moved
                     lastAxisPoint = lastAxisPoint.Value + snappedMove;
-                }
 
+                    return false;
+                }
                 return false;
             }
-            return true;
+
+            // Plane gizmos (XY, YZ, XZ)
+
+            else if (planeNames.Any(gizmoName.Contains))
+            {
+                if (dragPlane.Value.Plane.Raycast(mouseRay, out float enter) && enter <= maxDistance)
+                {
+                    Vector3[] axes = [dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized];
+
+                    Vector3 hitPoint = mouseRay.GetPoint(enter);
+
+                    // On initial click, store offset between pivot and where mouse hit the plane
+                    if (!lastAxisPoint.HasValue)
+                    {
+                        lastAxisPoint = selectionMiddlePivot;
+
+                        // Store offset for the rest of the drag
+                        initialDragOffset = hitPoint - selectionMiddlePivot.Value;
+                        return false; // Don't apply movement on initial click
+                    }
+
+                    Vector3 localOffset = hitPoint - initialDragOffset.Value;
+
+                    Vector3 rawMove = localOffset - lastAxisPoint.Value;
+
+                    Vector3 snappedMove = Vector3.zero;
+
+                    for (int i = 0; i < axes.Length; i++)
+                    {
+                        Vector3 axis = axes[i];
+
+                        // Determine grid step based on the axis and gizmo name
+                        float gridStep =
+                            (gizmoName.Contains("xy") && i == 1) ||     // Y axis in XY plane
+                            (gizmoName.Contains("yz") && i == 0)     // Y axis in YZ plane
+                            ? __instance.gridY
+                            : __instance.gridXZ;
+
+                        float moveAmount = Vector3.Dot(rawMove, axis);
+                        float snapped = gridStep > 0f ? Mathf.Round(moveAmount / gridStep) * gridStep : moveAmount;
+                        snappedMove += axis * snapped;
+                    }
+
+                    foreach (var obj in selectionList)
+                        obj.transform.position += snappedMove;
+
+                    __instance.motherGizmo.transform.position += snappedMove;
+
+                    lastAxisPoint = lastAxisPoint.Value + snappedMove;
+
+                    return false;
+                }
+                Plugin.logger.LogWarning($"Mouse ray did not hit the plane for gizmo {gizmoName} (enter = {enter}). Skipping drag.");
+                return false;
+            }
+            return false;
 
         }
 
-        static Vector3? GetTranslationVector(Transform gizmo, BlockProperties reference)
+        static Vector3? GetTranslationVector(BlockProperties reference, string name)
         {
-            string name = gizmo.name.Replace("Gizmo", "").ToLower();
 
             if (name.Contains("x") && !name.Contains("y") && !name.Contains("z"))
                 return reference.transform.right;
@@ -589,80 +593,64 @@ namespace LocalTranslation.src
             return null;
         }
 
-        static DragPlane? GetPlaneFromGizmo(Transform gizmo, BlockProperties reference)
+        static DragPlane? GetPlaneFromGizmo(BlockProperties reference, Ray mouseRay, string name)
         {
-            if (gizmo.name.Contains("XY"))
+            Ray ray = mouseRay; // Use the mouse ray for intersection checks
+
+            // Plane handles (XY, XZ, YZ)
+            if (name.Contains("xy"))
+                return new DragPlane(new Plane(reference.transform.forward, reference.transform.position), reference.transform.right, reference.transform.up);
+            if (name.Contains("xz"))
+                return new DragPlane(new Plane(reference.transform.up, reference.transform.position), reference.transform.right, reference.transform.forward);
+            if (name.Contains("yz"))
+                return new DragPlane(new Plane(reference.transform.right, reference.transform.position), reference.transform.up, reference.transform.forward);
+
+            // Axis handles (X, Y, Z)
+            Vector3 axis;
+            if (name == "x") axis = reference.transform.right;
+            else if (name == "y") axis = reference.transform.up;
+            else if (name == "z") axis = reference.transform.forward;
+            else
             {
-                Vector3 normal = reference.transform.forward;
-                Vector3 axis1 = reference.transform.right;
-                Vector3 axis2 = reference.transform.up;
-                return new DragPlane(new Plane(normal, reference.transform.position), axis1, axis2);
-            }
-            else if (gizmo.name.Contains("XZ"))
-            {
-                Vector3 normal = reference.transform.up;
-                Vector3 axis1 = reference.transform.right;
-                Vector3 axis2 = reference.transform.forward;
-                return new DragPlane(new Plane(normal, reference.transform.position), axis1, axis2);
-            }
-            else if (gizmo.name.Contains("YZ"))
-            {
-                Vector3 normal = reference.transform.right;
-                Vector3 axis1 = reference.transform.forward;
-                Vector3 axis2 = reference.transform.up;
-                return new DragPlane(new Plane(normal, reference.transform.position), axis1, axis2);
+                Plugin.logger.LogWarning($"Unknown gizmo name: {name}");
+                return null;
             }
 
-            return null;
+            // Use vector from camera to object as a stable basis
+            Vector3 toObject = (reference.transform.position - Camera.main.transform.position).normalized;
+
+            // Make a plane perpendicular to axis and facing the camera
+            Vector3 planeNormal = Vector3.Cross(axis, toObject.normalized).normalized;
+            if (planeNormal == Vector3.zero)
+            {
+                Plugin.logger.LogWarning($"Plane normal is zero for gizmo {name}. Cannot create drag plane.");
+                return null;
+            }
+
+            planeNormal = Vector3.Cross(planeNormal, axis).normalized;
+
+            float dot = Mathf.Abs(Vector3.Dot(ray.direction.normalized, planeNormal));
+            if (dot < 0.1f)
+            {
+                // Plugin.logger.LogWarning($"Plane is nearly parallel to mouse ray (dot = {dot}) gizmo {name}. Skipping drag.");
+                return null;
+            }
+
+            return new DragPlane(new Plane(planeNormal, reference.transform.position), Vector3.zero, Vector3.zero);
         }
 
 
-        static Vector3 ClosestPointBetweenLines(Ray ray1, Ray ray2)
+
+        public struct DragPlane(Plane plane, Vector3 axis1, Vector3 axis2)
         {
-
-            Ray ray1_ = ray1;
-            Ray ray2_ = ray2;
-
-            Vector3 p1 = ray1_.origin;
-            Vector3 d1 = ray1_.direction;
-            Vector3 p2 = ray2_.origin;
-            Vector3 d2 = ray2_.direction;
-
-            float a = Vector3.Dot(d1, d1);
-            float b = Vector3.Dot(d1, d2);
-            float e = Vector3.Dot(d2, d2);
-
-            Vector3 r = p1 - p2;
-            float c = Vector3.Dot(d1, r);
-            float f = Vector3.Dot(d2, r);
-
-            float denominator = a * e - b * b;
-
-            // Check if lines are parallel
-            if (Mathf.Abs(denominator) < 0.0001f)
-                return p1; // Arbitrary fallback, could return p1 or p2
-
-            float s = (b * f - c * e) / denominator;
-            return p1 + d1 * s;
-        }
-
-        public struct DragPlane
-        {
-            public Plane Plane;
-            public Vector3 Axis1; // Local "right" axis
-            public Vector3 Axis2; // Local "up" axis
-
-            public DragPlane(Plane plane, Vector3 axis1, Vector3 axis2)
-            {
-                Plane = plane;
-                Axis1 = axis1;
-                Axis2 = axis2;
-            }
+            public Plane Plane = plane;
+            public Vector3 Axis1 = axis1; // Local "right" axis
+            public Vector3 Axis2 = axis2; // Local "up" axis
         }
     }
 
     [HarmonyPatch(typeof(LEV_MotherGizmoFlipper), "Update")]
-    public class TranslationGizmo_Update_Patch
+    public class Patch_LEV_MotherGizmoFlipperUpdate_LocalTranslation
     {
         static bool Prefix(LEV_MotherGizmoFlipper __instance)
         {
@@ -687,7 +675,7 @@ namespace LocalTranslation.src
     }
 
     [HarmonyPatch(typeof(LEV_GizmoHandler), "DisableGizmosOnDistance")]
-    public static class TranslationGizmo_DisablePatch
+    public static class Patch_DisableGizmosOnDistance_LocalTranslation
     {
         static bool Prefix(LEV_GizmoHandler __instance)
         {
@@ -737,7 +725,7 @@ namespace LocalTranslation.src
     }
 
     [HarmonyPatch(typeof(LEV_CustomButton), "SetToDefaultColor")]
-    public static class CustomButton_SetToDefaultColor_Patch
+    public static class Patch_SetToDefaultColor_LocalTranslation
     {
         static void Postfix(LEV_CustomButton __instance)
         {
@@ -764,7 +752,25 @@ namespace LocalTranslation.src
         }
     }
 
+    // SetMotherPosition
+    [HarmonyPatch(typeof(LEV_GizmoHandler), "SetMotherPosition")]
+    public static class Patch_SetMotherPosition_LocalTranslation
+    {
+        static void Postfix(LEV_GizmoHandler __instance)
+        {
+            if (__instance is null)
+            {
+                throw new ArgumentNullException(nameof(__instance));
+            }
 
+            if (Plugin.Instance.useLocalMode && Plugin.Instance.isModEnabled)
+            {
+                // Reset the last mouse position to the current mouse position
+                Patch_DragGizmo_LocalTranslation.lastAxisPoint = null;
+
+            }
+        }
+    }
 
     public class ModConfig : MonoBehaviour
     {
