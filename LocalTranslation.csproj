@@ -32,6 +32,15 @@
         <ModDirectory>C:\Program Files (x86)\Steam\steamapps\common\Zeepkist\BepInEx\plugins\Sideloaded\Plugins\LocalTranslation</ModDirectory>
     </PropertyGroup>
 
+    <!-- Define ModDirectory based on OS -->
+    <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+        <ModDirectory>C:\Program Files (x86)\Steam\steamapps\common\Zeepkist\BepInEx\plugins\Sideloaded\Plugins\LocalTranslation</ModDirectory>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+        <ModDirectory>$(HOME)/.steam/debian-installation/steamapps/common/Zeepkist/BepInEx/plugins/Sideloaded/Plugins/LocalTranslation</ModDirectory>
+    </PropertyGroup>
+
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <!-- Clean existing mod directory -->
