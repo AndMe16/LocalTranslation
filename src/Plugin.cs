@@ -138,7 +138,7 @@ public class Plugin : BaseUnityPlugin
         else
         {
             IsModEnabled = false;
-            UseLocalMode = false; // Reset local mode when not in Level Editor scene
+            UseLocalMode = false; // Reset local mode when not in a Level Editor scene
             ToggleLocalTranslationButton = null;
             _toggleLocalTranslationImage = null;
             CustomButton = null;
@@ -435,12 +435,30 @@ internal class PatchDragGizmoLocalTranslation
             //Plugin.logger.LogWarning($"Gizmo {gizmoTransform.name} does not match any DragPlane.");
             return false;
 
+        if (!dragPlane.Value.Plane.Raycast(mouseRay, out var enter) || !(enter <= MaxDistance)) return false;
+
+        var hitPoint = mouseRay.GetPoint(enter);
+
+        // On initial click, store offset between pivot and where mouse hit the plane
+        if (!lastAxisPoint.HasValue)
+        {
+            lastAxisPoint = selectionMiddlePivot;
+
+            // Store offset for the rest of the drag
+            if (selectionMiddlePivot != null) _initialDragOffset = hitPoint - selectionMiddlePivot.Value;
+            return false; // Don't apply movement on the initial click
+        }
+
+        if (_initialDragOffset == null) return false;
+
+        var localOffset = hitPoint - _initialDragOffset.Value;
+
+        var snappedMove = Vector3.zero;
+
         // Axis gizmos (X, Y, Z)
 
         if (AxisNames.Any(gizmoName.Equals))
         {
-            if (!dragPlane.Value.Plane.Raycast(mouseRay, out var enter) || !(enter <= MaxDistance)) return false;
-
             var axis = GetTranslationVector(lastSelected, gizmoName);
 
             if (axis == null)
@@ -449,101 +467,51 @@ internal class PatchDragGizmoLocalTranslation
                 return false;
             }
 
-            var hitPoint = mouseRay.GetPoint(enter);
-
-            // On initial click, store offset between pivot and where mouse hit the plane
-            if (!lastAxisPoint.HasValue)
-            {
-                lastAxisPoint = selectionMiddlePivot;
-
-                // Store offset for the rest of the drag
-                if (selectionMiddlePivot != null) _initialDragOffset = hitPoint - selectionMiddlePivot.Value;
-                return false; // Don't apply movement on initial click
-            }
-
-            if (_initialDragOffset == null) return false;
-
-            var localOffset = hitPoint - _initialDragOffset.Value;
+            var gridStep = gizmoName.Contains("y") ? __instance.gridY : __instance.gridXZ;
 
             var closestPoint = Vector3.Project(localOffset, axis.Value);
 
             var moveDir = closestPoint - lastAxisPoint.Value;
 
-            var gridStep = gizmoName.Contains("y") ? __instance.gridY : __instance.gridXZ;
             var distance = Vector3.Dot(moveDir, axis.Value);
             var snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
-            var snappedMove = axis.Value * snappedDistance;
-
-            // Apply movement
-            foreach (var obj in selectionList)
-                obj.transform.position += snappedMove;
-
-            __instance.motherGizmo.transform.position += snappedMove;
-
-            // Advance lastAxisPoint by how far we actually moved
-            lastAxisPoint = lastAxisPoint.Value + snappedMove;
-
-            return false;
+            snappedMove = axis.Value * snappedDistance;
         }
 
         // Plane gizmos (XY, YZ, XZ)
 
         if (!PlaneNames.Any(gizmoName.Contains)) return false;
         {
-            if (dragPlane.Value.Plane.Raycast(mouseRay, out var enter) && enter <= MaxDistance)
+            Vector3[] axes = [dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized];
+
+            var rawMove = localOffset - lastAxisPoint.Value;
+
+            for (var i = 0; i < axes.Length; i++)
             {
-                Vector3[] axes = [dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized];
+                var axis = axes[i];
 
-                var hitPoint = mouseRay.GetPoint(enter);
+                // Determine a grid step based on the axis and gizmo name
+                var gridStep =
+                    (gizmoName.Contains("xy") && i == 1) || // Y-axis in XY plane
+                    (gizmoName.Contains("yz") && i == 0) // Y-axis in YZ plane
+                        ? __instance.gridY
+                        : __instance.gridXZ;
 
-                // On initial click, store offset between pivot and where mouse hit the plane
-                if (!lastAxisPoint.HasValue)
-                {
-                    lastAxisPoint = selectionMiddlePivot;
-
-                    // Store offset for the rest of the drag
-                    if (selectionMiddlePivot != null) _initialDragOffset = hitPoint - selectionMiddlePivot.Value;
-                    return false; // Don't apply movement on initial click
-                }
-
-                if (_initialDragOffset == null) return false;
-
-                var localOffset = hitPoint - _initialDragOffset.Value;
-
-                var rawMove = localOffset - lastAxisPoint.Value;
-
-                var snappedMove = Vector3.zero;
-
-                for (var i = 0; i < axes.Length; i++)
-                {
-                    var axis = axes[i];
-
-                    // Determine a grid step based on the axis and gizmo name
-                    var gridStep =
-                        (gizmoName.Contains("xy") && i == 1) || // Y-axis in XY plane
-                        (gizmoName.Contains("yz") && i == 0) // Y-axis in YZ plane
-                            ? __instance.gridY
-                            : __instance.gridXZ;
-
-                    var moveAmount = Vector3.Dot(rawMove, axis);
-                    var snapped = gridStep > 0f ? Mathf.Round(moveAmount / gridStep) * gridStep : moveAmount;
-                    snappedMove += axis * snapped;
-                }
-
-                foreach (var obj in selectionList)
-                    obj.transform.position += snappedMove;
-
-                __instance.motherGizmo.transform.position += snappedMove;
-
-                lastAxisPoint = lastAxisPoint.Value + snappedMove;
-
-                return false;
+                var moveAmount = Vector3.Dot(rawMove, axis);
+                var snapped = gridStep > 0f ? Mathf.Round(moveAmount / gridStep) * gridStep : moveAmount;
+                snappedMove += axis * snapped;
             }
-
-            // Plugin.logger.LogWarning(
-            //     $"Mouse ray did not hit the plane for gizmo {gizmoName} (enter = {enter}). Skipping drag.");
-            return false;
         }
+        // Apply movement
+        foreach (var obj in selectionList)
+            obj.transform.position += snappedMove;
+
+        __instance.motherGizmo.transform.position += snappedMove;
+
+        // Advance lastAxisPoint by how far we actually moved
+        lastAxisPoint = lastAxisPoint.Value + snappedMove;
+
+        return false;
     }
 
     private static Vector3? GetTranslationVector(BlockProperties reference, string name)
@@ -596,7 +564,7 @@ internal class PatchDragGizmoLocalTranslation
 
         var toObject = (reference.transform.position - Camera.main.transform.position).normalized;
 
-        // Make a plane perpendicular to axis and facing the camera
+        // Make a plane perpendicular to the axis and facing the camera
         var planeNormal = Vector3.Cross(axis, toObject.normalized).normalized;
         if (planeNormal == Vector3.zero)
         {
@@ -664,15 +632,15 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
             var camTransform = Camera.main.transform;
             var gizmoRoot = __instance.translationGizmos.transform;
 
-            // Calculate a view direction in local gizmo space
+            // Calculate a view direction in a local gizmo space
             var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
                                 gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
 
             // Thresholds
-            const float axisDotThreshold = 0.98f; // axis disappears if the view is almost parallel to axis
+            const float axisDotThreshold = 0.98f; // the axis disappears if the view is almost parallel to the axis
             const float planeDotThreshold = 0.05f; // plane disappears if view is nearly perpendicular to the plane
 
-            // Axis gizmos: disable if camera is looking *along* the axis
+            // Axis gizmos: disable if the camera is looking *along* the axis
             SetGizmoActive(__instance.Xgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) < axisDotThreshold);
             SetGizmoActive(__instance.Ygizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) < axisDotThreshold);
             SetGizmoActive(__instance.Zgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.forward)) < axisDotThreshold);
