@@ -480,7 +480,7 @@ internal class PatchDragGizmoLocalTranslation
 
         // Plane gizmos (XY, YZ, XZ)
 
-        if (!PlaneNames.Any(gizmoName.Contains)) return false;
+        else if (PlaneNames.Any(gizmoName.Equals))
         {
             Vector3[] axes = [dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized];
 
@@ -502,6 +502,7 @@ internal class PatchDragGizmoLocalTranslation
                 snappedMove += axis * snapped;
             }
         }
+
         // Apply movement
         foreach (var obj in selectionList)
             obj.transform.position += snappedMove;
