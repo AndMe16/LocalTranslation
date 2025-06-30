@@ -4,6 +4,7 @@ using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
+using FMODSyntax;
 using HarmonyLib;
 using JetBrains.Annotations;
 using TMPro;
@@ -45,6 +46,8 @@ public class Plugin : BaseUnityPlugin
     internal GameObject ToggleLocalTranslationButton;
     internal bool UseLocalMode;
 
+    internal Transform referenceBlock;
+
     public static Plugin Instance { get; private set; }
 
     private void Awake()
@@ -75,13 +78,29 @@ public class Plugin : BaseUnityPlugin
     {
         if (!IsModEnabled) return;
 
+        if (!LevelEditorCentral) return;
+
         // Check if the user has toggled the local translation mode
-        if (!Input.GetKeyDown(ModConfig.toggleMode.Value)) return;
+        if (Input.GetKeyDown(ModConfig.toggleMode.Value) && !LevelEditorCentral.input.inputLocked && !LevelEditorCentral.gizmos.isGrabbing)
+        {
+            UseLocalMode = !UseLocalMode;
+            Logger.LogInfo($"Local Translation Mode: {(UseLocalMode ? "Enabled" : "Disabled")}");
 
-        UseLocalMode = !UseLocalMode;
-        Logger.LogInfo($"Local Translation Mode: {(UseLocalMode ? "Enabled" : "Disabled")}");
+            SetRotationToLocalMode();
+        }
 
-        SetRotationToLocalMode();
+        if (Input.GetKeyDown(ModConfig.setReference.Value) && !LevelEditorCentral.input.inputLocked && !LevelEditorCentral.gizmos.isGrabbing)
+        {
+            if (LevelEditorCentral.selection.list.Count == 0)
+            {
+                Logger.LogWarning("No blocks selected for local translation.");
+                return;
+            }
+
+            referenceBlock = LevelEditorCentral.selection.list[^1].transform;
+            Logger.LogInfo(
+                $"Reference block for local translation set to: {referenceBlock.name} at position {referenceBlock.position} with rotation {referenceBlock.rotation}");
+        }
     }
 
     private void OnDestroy()
@@ -431,9 +450,7 @@ internal class PatchDragGizmoLocalTranslation
 
         var dragPlane = GetPlaneFromGizmo(lastSelected, mouseRay, gizmoName);
 
-        if (dragPlane == null)
-            //Plugin.logger.LogWarning($"Gizmo {gizmoTransform.name} does not match any DragPlane.");
-            return false;
+        if (dragPlane == null) return false;
 
         // Axis gizmos (X, Y, Z)
 
@@ -483,6 +500,14 @@ internal class PatchDragGizmoLocalTranslation
             // Advance lastAxisPoint by how far we actually moved
             lastAxisPoint = lastAxisPoint.Value + snappedMove;
 
+            if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && gridStep > 0f)
+            {
+                AudioEvents.MenuHover1.Play(null);
+                __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+            }
+
+            __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
+
             return false;
         }
 
@@ -512,6 +537,8 @@ internal class PatchDragGizmoLocalTranslation
 
                 var rawMove = localOffset - lastAxisPoint.Value;
 
+                var gotSnapped = false;
+
                 var snappedMove = Vector3.zero;
 
                 for (var i = 0; i < axes.Length; i++)
@@ -527,6 +554,9 @@ internal class PatchDragGizmoLocalTranslation
 
                     var moveAmount = Vector3.Dot(rawMove, axis);
                     var snapped = gridStep > 0f ? Mathf.Round(moveAmount / gridStep) * gridStep : moveAmount;
+
+                    gotSnapped = (snapped != moveAmount) || gotSnapped;
+
                     snappedMove += axis * snapped;
                 }
 
@@ -537,11 +567,14 @@ internal class PatchDragGizmoLocalTranslation
 
                 lastAxisPoint = lastAxisPoint.Value + snappedMove;
 
+                if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && gotSnapped)
+                {
+                    AudioEvents.MenuHover1.Play(null);
+                    __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+                }
+
                 return false;
             }
-
-            // Plugin.logger.LogWarning(
-            //     $"Mouse ray did not hit the plane for gizmo {gizmoName} (enter = {enter}). Skipping drag.");
             return false;
         }
     }
@@ -761,14 +794,171 @@ public static class PatchSetMotherPositionLocalTranslation
     }
 }
 
+// GrabGizmo
+[HarmonyPatch(typeof(LEV_GizmoHandler), nameof(LEV_GizmoHandler.GrabGizmo))]
+public static class PatchGrabGizmoLocalTranslation
+{
+    internal static Vector3? lastAxisPoint;
+    private static readonly float MaxDistance = 1500;
+
+    static bool Prefix(LEV_GizmoHandler __instance)
+    {
+
+        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return true;
+
+        // Safety check
+        if (!Plugin.Instance.referenceBlock) return true;
+
+        // Get the first selected block
+        Transform selectedTransform = Plugin.Instance.referenceBlock;
+        Vector3 planeNormal = selectedTransform.up;
+        Vector3 planeOrigin = selectedTransform.position;
+        Vector3[] PlaneAxes = [selectedTransform.right, selectedTransform.forward];
+
+        // Create the custom drag plane
+        Plane dragPlane = new Plane(planeNormal, planeOrigin);
+
+        // Cast a ray from the mouse to the plane
+        Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+        if (!dragPlane.Raycast(mouseRay, out var enter) || !(enter <= MaxDistance)) return false;
+
+        var hitPoint = mouseRay.GetPoint(enter);
+
+        // On initial click, store offset between pivot and where mouse hit the plane
+        if (__instance.newGizmo)
+        {
+            __instance.central.selection.TranslatePositions(selectedTransform.position - __instance.central.selection.list[^1].transform.position);
+
+            __instance.SetMotherPosition(selectedTransform.position);
+
+            lastAxisPoint = selectedTransform.position;
+
+            // Match rotation to the selected block
+            // Perform rotation
+            Quaternion currentRotation = __instance.central.selection.list[^1].transform.rotation;
+            Quaternion targetRotation = selectedTransform.rotation;
+            Quaternion deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
+
+            // Convert quaternion delta to axis + angle
+            deltaRotation.ToAngleAxis(out float angle, out Vector3 axis);
+
+            __instance.central.rotflip.RotateBlocks(axis, angle, __instance.central.selection.list[^1].transform.position);
+            __instance.central.gizmos.ResetRotationGizmoRotation();
+
+            __instance.newGizmo = false;
+
+            Plugin.logger.LogInfo($"Local translation initialized with reference block: {selectedTransform.name} " +
+                $"at position {selectedTransform.position} with rotation {selectedTransform.rotation}");
+
+        }
+
+        var localOffset = hitPoint;
+
+        var rawMove = localOffset - lastAxisPoint.Value;
+
+        var snappedMove = Vector3.zero; 
+
+        float yScroll = SetYgridStep(__instance);
+        if (Mathf.Abs(yScroll) > 0f)
+        {
+            var scrollOffset = planeNormal * yScroll;
+            snappedMove += scrollOffset;
+
+            // Camera.main.transform.position += scrollOffset;
+        }
+
+        var xygridStep = __instance.gridXZ;
+        
+
+        for (var i = 0; i < PlaneAxes.Length; i++)
+        {
+            var axis = PlaneAxes[i];
+
+            // Determine a grid step based on the axis and gizmo name
+            var moveAmount = Vector3.Dot(rawMove, axis);
+            var snapped = xygridStep > 0f ? Mathf.Round(moveAmount / xygridStep) * xygridStep : moveAmount;
+            snappedMove += axis * snapped;
+        }
+
+        // Apply movement to the selected block
+
+        __instance.motherGizmo.transform.position += snappedMove;
+        __instance.dragGizmoOrigin = __instance.motherGizmo.position;
+        __instance.central.selection.TranslatePositions(snappedMove);
+
+        if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && xygridStep > 0f)
+        {
+            AudioEvents.MenuHover1.Play(null);
+            __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+        }
+
+        lastAxisPoint = lastAxisPoint.Value + snappedMove;
+
+        return false;
+    }
+
+    private static float SetYgridStep(LEV_GizmoHandler __instance)
+    {
+        float yGridStep = (__instance.gridY == 0f) ? __instance.list_gridY[^1] : __instance.gridY;
+
+        if (__instance.central.input.GizmoGridVertical.positiveButtonDown && !__instance.central.input.inputLocked)
+        {
+            return yGridStep;
+        }
+        else if (__instance.central.input.GizmoGridVertical.negativeButtonDown && !__instance.central.input.inputLocked)
+        {
+            return -yGridStep;
+        }
+
+        return 0f;
+    }
+
+}
+
+// Update Gizmo_Handler
+[HarmonyPatch(typeof(LEV_GizmoHandler), "Update")]
+public static class PatchGizmoHandlerUpdateLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_GizmoHandler __instance)
+    {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+
+        if (__instance.central.selection.list.Count == 0) return;
+
+        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled && __instance.isGrabbing && !__instance.central.selection.list[^1].placeDynamic)
+        {
+            // If the gridHeightHelper is not active, activate it
+            __instance.gridHeightHelper.gameObject.SetActive(true);
+
+            __instance.gridHeightHelper.position = __instance.central.selection.list[^1].transform.position;
+            __instance.gridHeightHelper.rotation = __instance.central.selection.list[^1].transform.rotation;
+
+        }
+        else if (__instance.central.selection.list.Count == 1 && !__instance.central.selection.list[0].placeDynamic)
+        {
+            __instance.gridHeightHelper.position = new Vector3(__instance.motherGizmo.position.x, __instance.newBlockHeight - 4f, __instance.motherGizmo.position.z);
+            __instance.gridHeightHelper.rotation = Quaternion.Euler(0, 0, 0);
+        }
+    }
+}
+
+
 public class ModConfig : MonoBehaviour
 {
     public static ConfigEntry<KeyCode> toggleMode;
+    public static ConfigEntry<KeyCode> setReference;
+
 
     // Constructor that takes a ConfigFile instance from the main class
     public static void Initialize(ConfigFile config)
     {
         toggleMode = config.Bind("1. Keybinds", "1.1 Toggle Global/Local", KeyCode.L,
             "Key to Toggle Global/Local translation");
+
+        setReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.J,
+            "Key to set the reference block");
     }
 }
