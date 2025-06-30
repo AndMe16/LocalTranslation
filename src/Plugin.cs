@@ -46,7 +46,8 @@ public class Plugin : BaseUnityPlugin
     internal GameObject ToggleLocalTranslationButton;
     internal bool UseLocalMode;
 
-    internal Transform referenceBlock;
+    internal GameObject referenceBlockObject;
+    private Transform referenceBlock;
 
     public static Plugin Instance { get; private set; }
 
@@ -98,8 +99,86 @@ public class Plugin : BaseUnityPlugin
             }
 
             referenceBlock = LevelEditorCentral.selection.list[^1].transform;
-            Logger.LogInfo(
-                $"Reference block for local translation set to: {referenceBlock.name} at position {referenceBlock.position} with rotation {referenceBlock.rotation}");
+
+            if (referenceBlockObject == null)
+                CreateReferenceBlockObject(referenceBlock); // only creates the GameObject, doesn't parent it
+
+            referenceBlockObject.SetActive(true);
+
+        }
+    }
+
+    void CreateReferenceBlockObject(Transform source)
+    {
+        if (referenceBlockObject == null)
+        {
+            //referenceBlockObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            //referenceBlockObject.name = "LocalReferenceBlock";
+            //referenceBlockObject.transform.localScale = Vector3.one * 5f;
+            //referenceBlockObject.GetComponent<Collider>().enabled = false;
+
+            //var mat = referenceBlockObject.GetComponent<Renderer>().material;
+            //mat.shader = Shader.Find("Standard");
+            //mat.SetColor("_Color", new Color(0, 1, 0, 0.3f));
+            //mat.SetFloat("_Mode", 3);
+            //mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            //mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            //mat.SetInt("_ZWrite", 0);
+            //mat.DisableKeyword("_ALPHATEST_ON");
+            //mat.EnableKeyword("_ALPHABLEND_ON");
+            //mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            //mat.renderQueue = 3000;
+
+            //referenceBlockObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+
+            referenceBlockObject = CreateReferenceGizmo();
+        }
+
+        referenceBlockObject.transform.position = source.position;
+        referenceBlockObject.transform.rotation = source.rotation;
+        referenceBlockObject.SetActive(true);
+    }
+
+    GameObject CreateReferenceGizmo()
+    {
+        var parent = new GameObject("ReferenceGizmo");
+
+        void CreateAxis(Vector3 direction, Color color)
+        {
+            var axis = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            axis.transform.SetParent(parent.transform, false);
+            axis.transform.localScale = new Vector3(0.5f, 5f, 0.5f);
+            axis.transform.localPosition = direction * 5f;
+            axis.transform.rotation = Quaternion.FromToRotation(Vector3.up, direction);
+
+            GameObject.Destroy(axis.GetComponent<Collider>());
+            var mat = axis.GetComponent<Renderer>().material;
+            mat.shader = Shader.Find("Standard");
+            mat.color = color;
+            mat.SetFloat("_Mode", 3);
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.DisableKeyword("_ALPHATEST_ON");
+            mat.EnableKeyword("_ALPHABLEND_ON");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.renderQueue = 3000;
+        }
+
+        CreateAxis(Vector3.right, Color.red);    // X
+        CreateAxis(Vector3.up, Color.green);     // Y
+        CreateAxis(Vector3.forward, Color.blue); // Z
+
+        parent.SetActive(false);
+        return parent;
+    }
+
+    void LateUpdate()
+    {
+        if (referenceBlockObject != null && referenceBlock != null)
+        {
+            referenceBlockObject.transform.position = referenceBlock.position;
+            referenceBlockObject.transform.rotation = referenceBlock.rotation;
         }
     }
 
@@ -774,16 +853,20 @@ public static class PatchGrabGizmoLocalTranslation
     static bool Prefix(LEV_GizmoHandler __instance)
     {
 
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return true;
+        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled)
+            return true;
 
         // Safety check
-        if (!Plugin.Instance.referenceBlock) return true;
+        if (Plugin.Instance.referenceBlockObject == null)
+            return true;
 
-        // Get the first selected block
-        Transform selectedTransform = Plugin.Instance.referenceBlock;
-        Vector3 planeNormal = selectedTransform.up;
-        Vector3 planeOrigin = selectedTransform.position;
-        Vector3[] PlaneAxes = [selectedTransform.right, selectedTransform.forward];
+        // Get the reference transform
+        Transform referenceTransform = Plugin.Instance.referenceBlockObject.transform;
+
+        Vector3 planeNormal = referenceTransform.up;
+        Vector3 planeOrigin = referenceTransform.position;
+        Vector3[] PlaneAxes = [referenceTransform.right, referenceTransform.forward];
+
 
         // Create the custom drag plane
         Plane dragPlane = new Plane(planeNormal, planeOrigin);
@@ -798,16 +881,16 @@ public static class PatchGrabGizmoLocalTranslation
         // On initial click, store offset between pivot and where mouse hit the plane
         if (__instance.newGizmo)
         {
-            __instance.central.selection.TranslatePositions(selectedTransform.position - __instance.central.selection.list[^1].transform.position);
+            __instance.central.selection.TranslatePositions(referenceTransform.position - __instance.central.selection.list[^1].transform.position);
 
-            __instance.SetMotherPosition(selectedTransform.position);
+            __instance.SetMotherPosition(referenceTransform.position);
 
-            lastAxisPoint = selectedTransform.position;
+            lastAxisPoint = referenceTransform.position;
 
             // Match rotation to the selected block
             // Perform rotation
             Quaternion currentRotation = __instance.central.selection.list[^1].transform.rotation;
-            Quaternion targetRotation = selectedTransform.rotation;
+            Quaternion targetRotation = referenceTransform.rotation;
             Quaternion deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
 
             // Convert quaternion delta to axis + angle
@@ -818,8 +901,8 @@ public static class PatchGrabGizmoLocalTranslation
 
             __instance.newGizmo = false;
 
-            Plugin.logger.LogInfo($"Local translation initialized with reference block: {selectedTransform.name} " +
-                $"at position {selectedTransform.position} with rotation {selectedTransform.rotation}");
+            Plugin.logger.LogInfo($"Local translation initialized with reference block: {referenceTransform.name} " +
+                $"at position {referenceTransform.position} with rotation {referenceTransform.rotation}");
 
         }
 
