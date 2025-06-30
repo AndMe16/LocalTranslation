@@ -490,21 +490,15 @@ internal class PatchDragGizmoLocalTranslation
 
             var moveDir = closestPoint - lastAxisPoint.Value;
 
-            // Advance lastAxisPoint by how far we actually moved
-            lastAxisPoint = lastAxisPoint.Value + snappedMove;
+            var distance = Vector3.Dot(moveDir, axis.Value);
+            var snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
+            snappedMove = axis.Value * snappedDistance;
 
-            if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && gridStep > 0f)
+            if (snappedMove != Vector3.zero && gridStep > 0f)
             {
                 AudioEvents.MenuHover1.Play(null);
                 __instance.rememberTranslation = __instance.motherGizmo.transform.position;
             }
-
-            __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
-
-            return false;
-            var distance = Vector3.Dot(moveDir, axis.Value);
-            var snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
-            snappedMove = axis.Value * snappedDistance;
         }
 
         // Plane gizmos (XY, YZ, XZ)
@@ -533,6 +527,12 @@ internal class PatchDragGizmoLocalTranslation
                 gotSnapped = (snapped != moveAmount) || gotSnapped;
                 snappedMove += axis * snapped;
             }
+
+            if (snappedMove != Vector3.zero && gotSnapped)
+            {
+                AudioEvents.MenuHover1.Play(null);
+                __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+            }
         }
 
         // Apply movement
@@ -543,11 +543,9 @@ internal class PatchDragGizmoLocalTranslation
 
         // Advance lastAxisPoint by how far we actually moved
         lastAxisPoint = lastAxisPoint.Value + snappedMove;
-        if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && gotSnapped)
-        {
-            AudioEvents.MenuHover1.Play(null);
-            __instance.rememberTranslation = __instance.motherGizmo.transform.position;
-        }
+        
+        __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
+
         return false;
     }
 
