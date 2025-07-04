@@ -44,10 +44,13 @@ public class Plugin : BaseUnityPlugin
     internal LEV_LevelEditorCentral LevelEditorCentral;
     internal GameObject ToggleLabel;
     internal GameObject ToggleLocalTranslationButton;
-    internal bool UseLocalMode;
+    internal bool UseLocalTranslationMode;
+    internal bool UseLocalGridMode;
 
     internal GameObject referenceBlockObject;
     private Transform referenceBlock;
+    private readonly float sizeOnScreen = 0.17f; // world‐units per unit of distance 
+    private readonly float maxReferenceSize = 6f; // maximum size of the reference block in world units
 
     public static Plugin Instance { get; private set; }
 
@@ -82,29 +85,65 @@ public class Plugin : BaseUnityPlugin
         if (!LevelEditorCentral) return;
 
         // Check if the user has toggled the local translation mode
-        if (Input.GetKeyDown(ModConfig.toggleMode.Value) && !LevelEditorCentral.input.inputLocked && !LevelEditorCentral.gizmos.isGrabbing)
+        if (Input.GetKeyDown(ModConfig.toggleMode.Value) && !LevelEditorCentral.input.inputLocked && 
+            !LevelEditorCentral.gizmos.isGrabbing && LevelEditorCentral.selection.list.Count != 0)
         {
-            UseLocalMode = !UseLocalMode;
-            Logger.LogInfo($"Local Translation Mode: {(UseLocalMode ? "Enabled" : "Disabled")}");
+            UseLocalTranslationMode = !UseLocalTranslationMode;
+            Logger.LogInfo($"Local Translation Mode: {(UseLocalTranslationMode ? "Enabled" : "Disabled")}");
 
             SetRotationToLocalMode();
         }
+
 
         if (Input.GetKeyDown(ModConfig.setReference.Value) && !LevelEditorCentral.input.inputLocked && !LevelEditorCentral.gizmos.isGrabbing)
         {
             if (LevelEditorCentral.selection.list.Count == 0)
             {
-                Logger.LogWarning("No blocks selected for local translation.");
+                if (referenceBlockObject != null)
+                {
+                    PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5);
+                    Destroy(referenceBlockObject);
+                    referenceBlock = null;
+                    UseLocalGridMode = false;
+
+                    logger.LogWarning("[LocTrans] Reference Block removed, local grid mode deactivated.");
+                }
+                else
+                {
+                    PlayerManager.Instance.messenger.LogCustomColor("[LocTrans] No blocks selected to set as reference", 5, Color.black, new Color(1f, 0.98f, 0.29f, 0.9f));
+                }
                 return;
             }
+
+            if (referenceBlock != null)
+            {
+                if(LevelEditorCentral.selection.list[^1].transform == referenceBlock)
+                {
+                    PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5);
+                    Destroy(referenceBlockObject);
+                    referenceBlock = null;
+                    UseLocalGridMode = false;
+                    logger.LogWarning("[LocTrans] Reference Block removed, local grid mode deactivated.");
+                    return;
+                }
+            }
+
+            if (!UseLocalTranslationMode)
+            {
+                UseLocalTranslationMode = true;
+                SetRotationToLocalMode();
+            }
+
+            UseLocalGridMode = true;
 
             referenceBlock = LevelEditorCentral.selection.list[^1].transform;
 
             if (referenceBlockObject == null)
-                CreateReferenceBlockObject(referenceBlock); // only creates the GameObject, doesn't parent it
+                CreateReferenceBlockObject(referenceBlock);
 
             referenceBlockObject.SetActive(true);
-
+            
+            PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5);
         }
     }
 
@@ -112,25 +151,6 @@ public class Plugin : BaseUnityPlugin
     {
         if (referenceBlockObject == null)
         {
-            //referenceBlockObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            //referenceBlockObject.name = "LocalReferenceBlock";
-            //referenceBlockObject.transform.localScale = Vector3.one * 5f;
-            //referenceBlockObject.GetComponent<Collider>().enabled = false;
-
-            //var mat = referenceBlockObject.GetComponent<Renderer>().material;
-            //mat.shader = Shader.Find("Standard");
-            //mat.SetColor("_Color", new Color(0, 1, 0, 0.3f));
-            //mat.SetFloat("_Mode", 3);
-            //mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            //mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            //mat.SetInt("_ZWrite", 0);
-            //mat.DisableKeyword("_ALPHATEST_ON");
-            //mat.EnableKeyword("_ALPHABLEND_ON");
-            //mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            //mat.renderQueue = 3000;
-
-            //referenceBlockObject.layer = LayerMask.NameToLayer("Ignore Raycast");
-
             referenceBlockObject = CreateReferenceGizmo();
         }
 
@@ -141,44 +161,69 @@ public class Plugin : BaseUnityPlugin
 
     GameObject CreateReferenceGizmo()
     {
-        var parent = new GameObject("ReferenceGizmo");
+        GameObject gizmoRoot = new GameObject("ReferenceGizmo");
 
-        void CreateAxis(Vector3 direction, Color color)
+        void CreateDisc(string name, Vector3 normal, Color color, float scaler)
         {
-            var axis = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            axis.transform.SetParent(parent.transform, false);
-            axis.transform.localScale = new Vector3(0.5f, 5f, 0.5f);
-            axis.transform.localPosition = direction * 5f;
-            axis.transform.rotation = Quaternion.FromToRotation(Vector3.up, direction);
+            // Outline
+            var outline = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            outline.name = name + "_Outline";
+            outline.transform.SetParent(gizmoRoot.transform, false);
+            outline.transform.localScale = new Vector3(1.1f*scaler, 0.03f, 1.1f * scaler); // 1 unit + tiny bit
+            outline.transform.localPosition = Vector3.zero;
+            outline.transform.rotation = Quaternion.FromToRotation(Vector3.up, normal);
+            Destroy(outline.GetComponent<Collider>());
 
-            GameObject.Destroy(axis.GetComponent<Collider>());
-            var mat = axis.GetComponent<Renderer>().material;
-            mat.shader = Shader.Find("Standard");
-            mat.color = color;
-            mat.SetFloat("_Mode", 3);
-            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetInt("_ZWrite", 0);
-            mat.DisableKeyword("_ALPHATEST_ON");
-            mat.EnableKeyword("_ALPHABLEND_ON");
-            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-            mat.renderQueue = 3000;
+            var oMat = outline.GetComponent<Renderer>().material;
+            oMat.shader = Shader.Find("Unlit/Color");
+            oMat.color = Color.black;
+
+            // Inner
+            var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            disc.name = name;
+            disc.transform.SetParent(gizmoRoot.transform, false);
+            disc.transform.localScale = new Vector3(1f * scaler, 0.05f, 1f * scaler);
+            disc.transform.localPosition = normal * 0.01f;
+            disc.transform.rotation = Quaternion.FromToRotation(Vector3.up, normal);
+            Destroy(disc.GetComponent<Collider>());
+
+            var dMat = disc.GetComponent<Renderer>().material;
+            dMat.shader = Shader.Find("Unlit/Color");
+            dMat.color = color;
         }
 
-        CreateAxis(Vector3.right, Color.red);    // X
-        CreateAxis(Vector3.up, Color.green);     // Y
-        CreateAxis(Vector3.forward, Color.blue); // Z
 
-        parent.SetActive(false);
-        return parent;
+
+        // Create one disc for each plane
+        CreateDisc("Disc_X", Vector3.right, Color.red, 1f);   // YZ plane
+        CreateDisc("Disc_Y", Vector3.up, Color.green, 1.01f);    // XZ plane
+        CreateDisc("Disc_Z", Vector3.forward, Color.blue, 1.02f); // XY plane
+
+        gizmoRoot.SetActive(false);
+        return gizmoRoot;
     }
 
     void LateUpdate()
     {
         if (referenceBlockObject != null && referenceBlock != null)
         {
+            // match position & rotation
             referenceBlockObject.transform.position = referenceBlock.position;
             referenceBlockObject.transform.rotation = referenceBlock.rotation;
+
+            // scale so that screen‐space size stays roughly constant
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                float dist = Vector3.Distance(cam.transform.position, referenceBlockObject.transform.position);
+                float uniformScale = Mathf.Min(dist * sizeOnScreen,maxReferenceSize);
+                referenceBlockObject.transform.localScale = Vector3.one * uniformScale;
+            }
+        }
+        else
+        {
+            Destroy(referenceBlockObject?.gameObject);
+            referenceBlockObject = null;
         }
     }
 
@@ -231,12 +276,13 @@ public class Plugin : BaseUnityPlugin
             CreateToggleLocalModeButton();
 
             IsModEnabled = true;
+            UseLocalGridMode = false; // Default to global translation mode
             // Logger.LogInfo("Level Editor scene loaded — mod activated.");
         }
         else
         {
             IsModEnabled = false;
-            UseLocalMode = false; // Reset local mode when not in a Level Editor scene
+            // UseLocalMode = false; // Reset local mode when not in a Level Editor scene
             ToggleLocalTranslationButton = null;
             _toggleLocalTranslationImage = null;
             CustomButton = null;
@@ -273,7 +319,7 @@ public class Plugin : BaseUnityPlugin
             {
                 Logger.LogInfo("Toggling Local Translation Mode.");
 
-                UseLocalMode = !UseLocalMode;
+                UseLocalTranslationMode = !UseLocalTranslationMode;
 
                 SetRotationToLocalMode();
             });
@@ -291,7 +337,7 @@ public class Plugin : BaseUnityPlugin
 
 
         _toggleLocalTranslationImage.sprite =
-            !UseLocalMode ? _sprites["Pivot_Average"] : _sprites["Pivot_LastSelected"];
+            !UseLocalTranslationMode ? _sprites["Pivot_Average"] : _sprites["Pivot_LastSelected"];
 
 
         ToggleLocalTranslationButton.SetActive(false);
@@ -317,7 +363,7 @@ public class Plugin : BaseUnityPlugin
         if (translationGizmos)
         {
             // Set gizmo rotation based on local mode
-            if (UseLocalMode)
+            if (UseLocalTranslationMode)
             {
                 var selectionList = LevelEditorCentral.selection.list;
                 switch (selectionList.Count)
@@ -367,8 +413,7 @@ internal class PatchSelectDragLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
-        if (!Plugin.Instance.IsModEnabled) return;
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(true);
         Plugin.Instance.ToggleLabel.SetActive(true);
     }
@@ -400,7 +445,7 @@ internal class PatchResetRotationLocalRotation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
     }
 }
 
@@ -414,7 +459,21 @@ internal class PatchActivateLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled) Plugin.Instance.SetRotationToLocalMode();
+    }
+}
+
+// ActiveAllGizmos
+[HarmonyPatch(typeof(LEV_GizmoHandler), "ActiveAllGizmos")]
+internal class PatchActiveAllGizmosLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_GizmoHandler __instance)
+    {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
+            Plugin.Instance.SetRotationToLocalMode();
     }
 }
 
@@ -428,25 +487,12 @@ internal class PatchGizmoJustGotClickedLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled)
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             // Reset the last mouse position to the current mouse position
             PatchDragGizmoLocalTranslation.lastAxisPoint = null;
     }
 }
 
-// CreateNewBlock
-[HarmonyPatch(typeof(LEV_GizmoHandler), "CreateNewBlock")]
-internal class PatchCreatingNewBlockLocalTranslation
-{
-    [UsedImplicitly]
-    // ReSharper disable once InconsistentNaming
-    private static void Postfix(LEV_GizmoHandler __instance)
-    {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return;
-        // Reset translationGizmos rotation
-        __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
-    }
-}
 
 // Deactivate
 [HarmonyPatch(typeof(LEV_GizmoHandler), "Deactivate")]
@@ -456,26 +502,12 @@ internal class PatchDeactivateLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static void Postfix(LEV_GizmoHandler __instance)
     {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
         // Reset translationGizmos rotation
         __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
     }
 }
 
-// AddThisBlock
-[HarmonyPatch(typeof(LEV_Selection), "AddThisBlock")]
-internal class PatchAddThisBlockLocalTranslation
-{
-    [UsedImplicitly]
-    // ReSharper disable once InconsistentNaming
-    private static void Postfix(LEV_Selection __instance)
-    {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return;
-        // Reset translationGizmos rotation
-        __instance.central.gizmos.translationGizmos.transform.localRotation =
-            __instance.central.selection.list[^1].transform.localRotation;
-    }
-}
 
 // DragGizmo
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DragGizmo")]
@@ -492,7 +524,7 @@ internal class PatchDragGizmoLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return true;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return true;
 
         var currentGizmo = __instance.currentGizmo;
         if (!currentGizmo)
@@ -712,7 +744,7 @@ public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_MotherGizmoFlipper __instance)
     {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return true;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return true;
 
         if (__instance.central.gizmos.isDragging)
             return false;
@@ -739,7 +771,7 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return true;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return true;
 
         if (Camera.main)
         {
@@ -799,7 +831,7 @@ public static class PatchSetToDefaultColorLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static void Postfix(LEV_CustomButton __instance)
     {
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled) return;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
 
         // Only apply the warning logic to the specific button you care about
         if (__instance != Plugin.Instance.CustomButton)
@@ -837,23 +869,24 @@ public static class PatchSetMotherPositionLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled)
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             // Reset the last mouse position to the current mouse position
             PatchDragGizmoLocalTranslation.lastAxisPoint = null;
     }
 }
 
 // GrabGizmo
-[HarmonyPatch(typeof(LEV_GizmoHandler), nameof(LEV_GizmoHandler.GrabGizmo))]
+[HarmonyPatch(typeof(LEV_GizmoHandler), "GrabGizmo")]
 public static class PatchGrabGizmoLocalTranslation
 {
     internal static Vector3? lastAxisPoint;
     private static readonly float MaxDistance = 1500;
+    private static Vector3 totalScrollOffset = Vector3.zero;
 
     static bool Prefix(LEV_GizmoHandler __instance)
     {
 
-        if (!Plugin.Instance.UseLocalMode || !Plugin.Instance.IsModEnabled)
+        if (!Plugin.Instance.UseLocalGridMode || !Plugin.Instance.IsModEnabled)
             return true;
 
         // Safety check
@@ -864,7 +897,7 @@ public static class PatchGrabGizmoLocalTranslation
         Transform referenceTransform = Plugin.Instance.referenceBlockObject.transform;
 
         Vector3 planeNormal = referenceTransform.up;
-        Vector3 planeOrigin = referenceTransform.position;
+        Vector3 planeOrigin = referenceTransform.position + totalScrollOffset;
         Vector3[] PlaneAxes = [referenceTransform.right, referenceTransform.forward];
 
 
@@ -899,6 +932,8 @@ public static class PatchGrabGizmoLocalTranslation
             __instance.central.rotflip.RotateBlocks(axis, angle, __instance.central.selection.list[^1].transform.position);
             __instance.central.gizmos.ResetRotationGizmoRotation();
 
+            totalScrollOffset = Vector3.zero;
+
             __instance.newGizmo = false;
 
             Plugin.logger.LogInfo($"Local translation initialized with reference block: {referenceTransform.name} " +
@@ -918,7 +953,9 @@ public static class PatchGrabGizmoLocalTranslation
             var scrollOffset = planeNormal * yScroll;
             snappedMove += scrollOffset;
 
-            // Camera.main.transform.position += scrollOffset;
+            totalScrollOffset += scrollOffset;
+
+            Camera.main.transform.position += scrollOffset;
         }
 
         var xygridStep = __instance.gridXZ;
@@ -981,7 +1018,7 @@ public static class PatchGizmoHandlerUpdateLocalTranslation
 
         if (__instance.central.selection.list.Count == 0) return;
 
-        if (Plugin.Instance.UseLocalMode && Plugin.Instance.IsModEnabled && __instance.isGrabbing && !__instance.central.selection.list[^1].placeDynamic)
+        if (Plugin.Instance.UseLocalGridMode && Plugin.Instance.IsModEnabled && __instance.isGrabbing && !__instance.central.selection.list[^1].placeDynamic)
         {
             // If the gridHeightHelper is not active, activate it
             __instance.gridHeightHelper.gameObject.SetActive(true);
@@ -1008,10 +1045,10 @@ public class ModConfig : MonoBehaviour
     // Constructor that takes a ConfigFile instance from the main class
     public static void Initialize(ConfigFile config)
     {
-        toggleMode = config.Bind("1. Keybinds", "1.1 Toggle Global/Local", KeyCode.L,
+        toggleMode = config.Bind("1. Keybinds", "1.1 Toggle Global/Local Translation", KeyCode.Keypad1,
             "Key to Toggle Global/Local translation");
 
-        setReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.J,
+        setReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.Keypad2,
             "Key to set the reference block");
     }
 }
