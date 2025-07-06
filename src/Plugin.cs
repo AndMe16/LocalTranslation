@@ -199,6 +199,14 @@ public class Plugin : BaseUnityPlugin
         CreateDisc("Disc_Y", Vector3.up, Color.green, 1.01f);    // XZ plane
         CreateDisc("Disc_Z", Vector3.forward, Color.blue, 1.02f); // XY plane
 
+        gizmoRoot.layer = 14;
+
+        // Also apply the layer to all children (Unity doesn't do this recursively)
+        foreach (Transform child in gizmoRoot.GetComponentsInChildren<Transform>(true))
+        {
+            child.gameObject.layer = 14;
+        }
+
         gizmoRoot.SetActive(false);
         return gizmoRoot;
     }
@@ -696,6 +704,8 @@ internal class PatchDragGizmoLocalTranslation
             renderer.material.EnableKeyword("_ALPHABLEND_ON");
             renderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
             renderer.material.renderQueue = 3000;
+
+            _originMarker.layer = 14; // Set to Ignore Raycast layer
         }
 
         GameObject.Destroy(_originMarker.GetComponent<Collider>()); // Remove the collider
