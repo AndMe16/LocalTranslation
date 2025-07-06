@@ -944,6 +944,8 @@ public static class PatchSnapToGridXZLocalTranslation
     }
 }
 
+
+// SnapToGridY
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SnapToGridY")]
 public static class PatchSnapToGridYLocalTranslation
 {
@@ -957,9 +959,49 @@ public static class PatchSnapToGridYLocalTranslation
     }
 }
 
+// ResetRotation
+[HarmonyPatch(typeof(LEV_GizmoHandler), "ResetRotation")]
+public static class PatchResetRotationLocalTranslation
+{
+    [UsedImplicitly]
+    private static bool Prefix(LEV_GizmoHandler __instance)
+    {
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
+            return true;
 
+        var selection = Plugin.Instance.LevelEditorCentral.selection;
+        var selectedList = selection.list;
 
+        Transform referenceTransform = Plugin.Instance.referenceBlockObject.transform;
 
+        if (selectedList.Count == 0 || Plugin.Instance.referenceBlockObject == null || __instance.isGrabbing)
+            return true;
+
+        var before = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
+
+        // Match rotation to the selected block
+        // Perform rotation
+        Quaternion currentRotation = selectedList[^1].transform.rotation;
+        Quaternion targetRotation = referenceTransform.rotation;
+        Quaternion deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
+
+        // Convert quaternion delta to axis + angle
+        deltaRotation.ToAngleAxis(out float angle, out Vector3 axis);
+
+        __instance.central.rotflip.RotateBlocks(axis, angle, selectedList[^1].transform.position);
+        __instance.central.gizmos.ResetRotationGizmoRotation();
+
+        var after = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
+        var selectionStr = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertSelectionToStringList(selectedList);
+
+        Plugin.Instance.LevelEditorCentral.validation.BreakLock(
+            Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBeforeAndAfterListToCollection(before, after, selectedList, selectionStr, selectionStr),
+            "Gizmo_LocalSnap"
+        );
+
+        return false; // Skip original method
+    }
+}
 
 public static class LocalGridSnapUtils
 {
