@@ -489,7 +489,20 @@ internal class PatchGizmoJustGotClickedLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             // Reset the last mouse position to the current mouse position
-            PatchDragGizmoLocalTranslation.lastAxisPoint = null;
+            PatchDragGizmoLocalTranslation.originPosition = null;
+    }
+}
+
+// GizmoJustGotReleased
+[HarmonyPatch(typeof(LEV_GizmoHandler), "GizmoJustGotReleased")]
+internal class PatchGizmoJustGotReleasedLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_GizmoHandler __instance)
+    {
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
+        PatchDragGizmoLocalTranslation.ClearOriginMarker();
     }
 }
 
@@ -514,11 +527,14 @@ internal class PatchDeactivateLocalTranslation
 internal class PatchDragGizmoLocalTranslation
 {
     private const float MaxDistance = 1500f;
-    internal static Vector3? lastAxisPoint;
     private static Vector3? _initialDragOffset = Vector3.zero;
+    internal static Vector3? originPosition;
+    private static bool gotSnapped = false;
 
     private static readonly List<string> PlaneNames = ["xy", "yz", "xz"];
     private static readonly List<string> AxisNames = ["x", "y", "z"];
+
+    private static GameObject _originMarker;
 
     [UsedImplicitly]
     // ReSharper disable once InconsistentNaming
@@ -568,16 +584,20 @@ internal class PatchDragGizmoLocalTranslation
         var hitPoint = mouseRay.GetPoint(enter);
 
         // On initial click, store offset between pivot and where mouse hit the plane
-        if (!lastAxisPoint.HasValue)
+        if (!originPosition.HasValue)
         {
-            lastAxisPoint = selectionMiddlePivot;
+            originPosition = selectionMiddlePivot;
 
-            // Store offset for the rest of the drag
-            if (selectionMiddlePivot != null) _initialDragOffset = hitPoint - selectionMiddlePivot.Value;
-            return false; // Don't apply movement on the initial click
+            if (originPosition != null)
+            {
+                _initialDragOffset = hitPoint - originPosition.Value;
+
+                // Spawn the visual indicator
+                CreateOriginMarker(originPosition.Value);
+            }
+
+            return false;
         }
-
-        if (_initialDragOffset == null) return false;
 
         var localOffset = hitPoint - _initialDragOffset.Value;
 
@@ -599,17 +619,13 @@ internal class PatchDragGizmoLocalTranslation
 
             var closestPoint = Vector3.Project(localOffset, axis.Value);
 
-            var moveDir = closestPoint - lastAxisPoint.Value;
+            var moveDir = closestPoint - originPosition.Value;
 
             var distance = Vector3.Dot(moveDir, axis.Value);
             var snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
             snappedMove = axis.Value * snappedDistance;
 
-            if (snappedMove != Vector3.zero && gridStep > 0f)
-            {
-                AudioEvents.MenuHover1.Play(null);
-                __instance.rememberTranslation = __instance.motherGizmo.transform.position;
-            }
+            gotSnapped = gridStep > 0f;
         }
 
         // Plane gizmos (XY, YZ, XZ)
@@ -618,9 +634,7 @@ internal class PatchDragGizmoLocalTranslation
         {
             Vector3[] axes = [dragPlane.Value.Axis1.normalized, dragPlane.Value.Axis2.normalized];
 
-            var rawMove = localOffset - lastAxisPoint.Value;
-
-            var gotSnapped = false;
+            var rawMove = localOffset - originPosition.Value;
 
             for (var i = 0; i < axes.Length; i++)
             {
@@ -638,27 +652,67 @@ internal class PatchDragGizmoLocalTranslation
                 gotSnapped = (snapped != moveAmount) || gotSnapped;
                 snappedMove += axis * snapped;
             }
+        }
 
-            if (snappedMove != Vector3.zero && gotSnapped)
-            {
-                AudioEvents.MenuHover1.Play(null);
-                __instance.rememberTranslation = __instance.motherGizmo.transform.position;
-            }
+        // Play sound
+        if (__instance.motherGizmo.transform.position != __instance.rememberTranslation  && gotSnapped)
+        {
+            AudioEvents.MenuHover1.Play(null);
+            __instance.rememberTranslation = __instance.motherGizmo.transform.position;
         }
 
         // Apply movement
         foreach (var obj in selectionList)
-            obj.transform.position += snappedMove;
+            obj.transform.position = originPosition.Value + (obj.transform.position - lastSelected.transform.position) + snappedMove;
 
-        __instance.motherGizmo.transform.position += snappedMove;
+        __instance.motherGizmo.transform.position = originPosition.Value + snappedMove;
 
-        // Advance lastAxisPoint by how far we actually moved
-        lastAxisPoint = lastAxisPoint.Value + snappedMove;
-        
         __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
 
         return false;
     }
+
+    private static void CreateOriginMarker(Vector3 position)
+    {
+        if (_originMarker != null)
+        {
+            GameObject.Destroy(_originMarker);
+        }
+
+        _originMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        _originMarker.transform.position = position;
+        _originMarker.transform.localScale = Vector3.one * 3f; // Small sphere
+
+        var renderer = _originMarker.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material = new Material(Shader.Find("Standard"));
+            renderer.material.color = new Color(1f, 1f, 0f, 0.7f); // Yellow with alpha
+            renderer.material.SetFloat("_Mode", 3); // Transparent mode
+            renderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            renderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            renderer.material.SetInt("_ZWrite", 0);
+            renderer.material.DisableKeyword("_ALPHATEST_ON");
+            renderer.material.EnableKeyword("_ALPHABLEND_ON");
+            renderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            renderer.material.renderQueue = 3000;
+        }
+
+        GameObject.Destroy(_originMarker.GetComponent<Collider>()); // Remove the collider
+    }
+
+    internal static void ClearOriginMarker()
+    {
+        if (_originMarker != null)
+        {
+            GameObject.Destroy(_originMarker);
+            _originMarker = null;
+        }
+
+        originPosition = null;
+        _initialDragOffset = null;
+    }
+
 
     private static Vector3? GetTranslationVector(BlockProperties reference, string name)
     {
@@ -871,7 +925,88 @@ public static class PatchSetMotherPositionLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             // Reset the last mouse position to the current mouse position
-            PatchDragGizmoLocalTranslation.lastAxisPoint = null;
+            PatchDragGizmoLocalTranslation.originPosition = null;
+    }
+}
+
+
+// SnapToGridXY
+[HarmonyPatch(typeof(LEV_GizmoHandler), "SnapToGridXZ")]
+public static class PatchSnapToGridXZLocalTranslation
+{
+    [UsedImplicitly]
+    private static bool Prefix(LEV_GizmoHandler __instance)
+    {
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
+            return true;
+
+        return LocalGridSnapUtils.SnapToLocalGrid(__instance, snapXZ: true, snapY: false);
+    }
+}
+
+[HarmonyPatch(typeof(LEV_GizmoHandler), "SnapToGridY")]
+public static class PatchSnapToGridYLocalTranslation
+{
+    [UsedImplicitly]
+    private static bool Prefix(LEV_GizmoHandler __instance)
+    {
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
+            return true;
+
+        return LocalGridSnapUtils.SnapToLocalGrid(__instance, snapXZ: false, snapY: true);
+    }
+}
+
+
+
+
+
+public static class LocalGridSnapUtils
+{
+    public static bool SnapToLocalGrid(LEV_GizmoHandler __instance, bool snapXZ, bool snapY)
+    {
+        var selection = Plugin.Instance.LevelEditorCentral.selection;
+        var selectedList = selection.list;
+
+        if (selectedList.Count == 0 || Plugin.Instance.referenceBlockObject == null || __instance.isGrabbing)
+            return true;
+
+        var refTransform = Plugin.Instance.referenceBlockObject.transform;
+
+        float gridXZ = __instance.gridXZ != 0f ? __instance.gridXZ : __instance.list_gridXZ[^1];
+        float gridY = __instance.gridY != 0f ? __instance.gridY : __instance.list_gridY[^1];
+
+        var referencePosition = selectedList[^1].transform.position;
+        var before = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
+
+        Quaternion rotation = refTransform.rotation;
+        Vector3 position = refTransform.position;
+        Matrix4x4 worldToLocal = Matrix4x4.TRS(position, rotation, Vector3.one).inverse;
+        Matrix4x4 localToWorld = Matrix4x4.TRS(position, rotation, Vector3.one);
+
+        Vector3 localPos = worldToLocal.MultiplyPoint(referencePosition);
+
+        float snappedX = snapXZ ? Mathf.Round(localPos.x / gridXZ) * gridXZ : localPos.x;
+        float snappedY = snapY ? Mathf.Round(localPos.y / gridY) * gridY : localPos.y;
+        float snappedZ = snapXZ ? Mathf.Round(localPos.z / gridXZ) * gridXZ : localPos.z;
+
+        Vector3 snappedLocalPos = new(snappedX, snappedY, snappedZ);
+        Vector3 snappedWorldPos = localToWorld.MultiplyPoint(snappedLocalPos);
+
+        Vector3 delta = snappedWorldPos - referencePosition;
+
+        Plugin.Instance.LevelEditorCentral.selection.TranslatePositions(delta);
+        __instance.SetMotherPosition(__instance.motherGizmo.position + delta);
+
+        var after = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
+        var selectionStr = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertSelectionToStringList(selectedList);
+
+        Plugin.Instance.LevelEditorCentral.validation.BreakLock(
+            Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBeforeAndAfterListToCollection(before, after, selectedList, selectionStr, selectionStr),
+            "Gizmo_LocalSnap"
+        );
+
+        return false;
     }
 }
 
