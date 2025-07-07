@@ -1108,6 +1108,16 @@ public static class PatchGrabGizmoLocalTranslation
         if (Plugin.Instance.referenceBlockObject == null)
             return true;
 
+        if (__instance.central.selection.list.Count == 0)
+            return true;
+
+        var lastSelectionPosition = __instance.central.selection.list[^1].transform.position;
+
+        if (lastSelectionPosition == null)
+        {
+            lastSelectionPosition = Plugin.Instance.referenceBlockObject.transform.position;
+        }
+
         // Get the reference transform
         Transform referenceTransform = Plugin.Instance.referenceBlockObject.transform;
 
@@ -1121,15 +1131,29 @@ public static class PatchGrabGizmoLocalTranslation
 
         // Cast a ray from the mouse to the plane
         Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        Vector3 hitPoint;
 
-        if (!dragPlane.Raycast(mouseRay, out var enter) || !(enter <= MaxDistance)) return false;
+        // Check if the ray intersects with the drag plane
+        if (!dragPlane.Raycast(mouseRay, out var enter))
+        {
+            hitPoint = lastSelectionPosition;
+        }
 
-        var hitPoint = mouseRay.GetPoint(enter);
+        else if (!(enter <= MaxDistance))
+        {
+            enter = MaxDistance;
+            hitPoint = mouseRay.GetPoint(enter);
+        }
+
+        else
+        {
+            hitPoint = mouseRay.GetPoint(enter);
+        }
 
         // On initial click, store offset between pivot and where mouse hit the plane
         if (__instance.newGizmo)
         {
-            __instance.central.selection.TranslatePositions(referenceTransform.position - __instance.central.selection.list[^1].transform.position);
+            __instance.central.selection.TranslatePositions(referenceTransform.position - lastSelectionPosition);
 
             __instance.SetMotherPosition(referenceTransform.position);
 
