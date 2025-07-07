@@ -590,7 +590,8 @@ internal class PatchDragGizmoLocalTranslation
         var mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
 
         var motherGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.motherGizmo;
-        var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
+        // var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
+        var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.translationGizmos.transform;
 
         if (!originPosition.HasValue)
         {
