@@ -1,17 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using FMODSyntax;
 using HarmonyLib;
 using JetBrains.Annotations;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using static UnityEngine.UIElements.StylePropertyAnimationSystem;
 
 namespace LocalTranslation;
 
@@ -543,6 +544,8 @@ internal class PatchDragGizmoLocalTranslation
     internal static Vector3? originPosition;
     private static DragPlane? dragPlane;
     private static bool gotSnapped = false;
+    private static List<float> gridValues = [];
+    private static Vector3? lastSnappedPosition = null;
 
     private static readonly List<string> PlaneNames = ["xy", "yz", "xz"];
     private static readonly List<string> AxisNames = ["x", "y", "z"];
@@ -597,6 +600,10 @@ internal class PatchDragGizmoLocalTranslation
                 // Spawn the visual indicator
                 CreateOriginMarker(originPosition.Value);
                 dragPlane = GetPlaneFromGizmo(motherGizmo, rotationGizmo, mouseRay, gizmoName);
+
+                gotSnapped = false;
+
+
             }            
         }
 
@@ -616,6 +623,8 @@ internal class PatchDragGizmoLocalTranslation
         var localOffset = hitPoint - _initialDragOffset.Value;
 
         var snappedMove = Vector3.zero;
+
+        gridValues = [];
 
         // Axis gizmos (X, Y, Z)
 
@@ -640,6 +649,8 @@ internal class PatchDragGizmoLocalTranslation
             snappedMove = axis.Value * snappedDistance;
 
             gotSnapped = gridStep > 0f;
+
+            gridValues.Add(gridStep);
         }
 
         // Plane gizmos (XY, YZ, XZ)
@@ -663,16 +674,14 @@ internal class PatchDragGizmoLocalTranslation
 
                 var moveAmount = Vector3.Dot(rawMove, axis);
                 var snapped = gridStep > 0f ? Mathf.Round(moveAmount / gridStep) * gridStep : moveAmount;
-                gotSnapped = (snapped != moveAmount) || gotSnapped;
+                if (gridStep > 0f && snapped != moveAmount)
+                {
+                    gotSnapped = true;
+                    gridValues.Add(gridStep);
+                }
+
                 snappedMove += axis * snapped;
             }
-        }
-
-        // Play sound
-        if (__instance.motherGizmo.position != __instance.rememberTranslation  && gotSnapped)
-        {
-            AudioEvents.MenuHover1.Play(null);
-            __instance.rememberTranslation = __instance.motherGizmo.position;
         }
 
         // Apply movement
@@ -682,6 +691,15 @@ internal class PatchDragGizmoLocalTranslation
         __instance.motherGizmo.position = originPosition.Value + snappedMove;
 
         __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
+
+        // Play Sound
+        float minNonZero = gridValues.Where(v => v > 0).DefaultIfEmpty(float.MaxValue).Min();
+
+        if (gotSnapped && (!lastSnappedPosition.HasValue || Vector3.Distance(__instance.motherGizmo.position, lastSnappedPosition.Value) >= minNonZero))
+        {
+            AudioEvents.MenuHover1.Play(null);
+        }
+        lastSnappedPosition = __instance.motherGizmo.position;
 
         return false;
     }
