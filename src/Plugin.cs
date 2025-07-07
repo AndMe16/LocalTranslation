@@ -496,9 +496,13 @@ internal class PatchGizmoJustGotClickedLocalTranslation
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
+        {
             // Reset the last mouse position to the current mouse position
             PatchDragGizmoLocalTranslation.originPosition = null;
+            PatchDragGizmoLocalTranslation._initialDragOffset = null;
+        }
     }
+            
 }
 
 // GizmoJustGotReleased
@@ -535,7 +539,7 @@ internal class PatchDeactivateLocalTranslation
 internal class PatchDragGizmoLocalTranslation
 {
     private const float MaxDistance = 1500f;
-    private static Vector3? _initialDragOffset;
+    internal static Vector3? _initialDragOffset;
     internal static Vector3? originPosition;
     private static DragPlane? dragPlane;
     private static bool gotSnapped = false;
@@ -936,8 +940,12 @@ public static class PatchSetMotherPositionLocalTranslation
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
+        {
             // Reset the last mouse position to the current mouse position
             PatchDragGizmoLocalTranslation.originPosition = null;
+            PatchDragGizmoLocalTranslation._initialDragOffset = null;
+        }
+            
     }
 }
 
