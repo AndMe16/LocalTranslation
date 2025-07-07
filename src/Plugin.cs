@@ -535,8 +535,9 @@ internal class PatchDeactivateLocalTranslation
 internal class PatchDragGizmoLocalTranslation
 {
     private const float MaxDistance = 1500f;
-    private static Vector3? _initialDragOffset = Vector3.zero;
+    private static Vector3? _initialDragOffset;
     internal static Vector3? originPosition;
+    private static DragPlane? dragPlane;
     private static bool gotSnapped = false;
 
     private static readonly List<string> PlaneNames = ["xy", "yz", "xz"];
@@ -566,8 +567,6 @@ internal class PatchDragGizmoLocalTranslation
         }
 
         var selectionList = selection.list;
-        var lastSelected = selectionList[^1];
-        var selectionMiddlePivot = Plugin.Instance.LevelEditorCentral?.gizmos?.motherGizmo?.transform.position;
 
         if (selectionList.Count == 0)
         {
@@ -583,7 +582,19 @@ internal class PatchDragGizmoLocalTranslation
 
         var mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
 
-        var dragPlane = GetPlaneFromGizmo(lastSelected, mouseRay, gizmoName);
+        var motherGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.motherGizmo;
+        var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
+
+        if (!originPosition.HasValue)
+        {
+            originPosition = motherGizmo.position;
+            if (originPosition != null)
+            {
+                // Spawn the visual indicator
+                CreateOriginMarker(originPosition.Value);
+                dragPlane = GetPlaneFromGizmo(motherGizmo, rotationGizmo, mouseRay, gizmoName);
+            }            
+        }
 
         if (dragPlane == null) return false;
 
@@ -592,18 +603,9 @@ internal class PatchDragGizmoLocalTranslation
         var hitPoint = mouseRay.GetPoint(enter);
 
         // On initial click, store offset between pivot and where mouse hit the plane
-        if (!originPosition.HasValue)
+        if (!_initialDragOffset.HasValue)
         {
-            originPosition = selectionMiddlePivot;
-
-            if (originPosition != null)
-            {
-                _initialDragOffset = hitPoint - originPosition.Value;
-
-                // Spawn the visual indicator
-                CreateOriginMarker(originPosition.Value);
-            }
-
+            _initialDragOffset = hitPoint - originPosition.Value;
             return false;
         }
 
@@ -615,7 +617,7 @@ internal class PatchDragGizmoLocalTranslation
 
         if (AxisNames.Any(gizmoName.Equals))
         {
-            var axis = GetTranslationVector(lastSelected, gizmoName);
+            var axis = GetTranslationVector(rotationGizmo, gizmoName);
 
             if (axis == null)
             {
@@ -663,17 +665,17 @@ internal class PatchDragGizmoLocalTranslation
         }
 
         // Play sound
-        if (__instance.motherGizmo.transform.position != __instance.rememberTranslation  && gotSnapped)
+        if (__instance.motherGizmo.position != __instance.rememberTranslation  && gotSnapped)
         {
             AudioEvents.MenuHover1.Play(null);
-            __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+            __instance.rememberTranslation = __instance.motherGizmo.position;
         }
 
         // Apply movement
         foreach (var obj in selectionList)
-            obj.transform.position = originPosition.Value + (obj.transform.position - lastSelected.transform.position) + snappedMove;
+            obj.transform.position = originPosition.Value + snappedMove + (obj.transform.position - __instance.motherGizmo.position);
 
-        __instance.motherGizmo.transform.position = originPosition.Value + snappedMove;
+        __instance.motherGizmo.position = originPosition.Value + snappedMove;
 
         __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
 
@@ -724,45 +726,45 @@ internal class PatchDragGizmoLocalTranslation
     }
 
 
-    private static Vector3? GetTranslationVector(BlockProperties reference, string name)
+    private static Vector3? GetTranslationVector(Transform reference, string name)
     {
         if (name.Contains("x") && !name.Contains("y") && !name.Contains("z"))
-            return reference.transform.right;
+            return reference.right;
         if (name.Contains("y") && !name.Contains("x") && !name.Contains("z"))
-            return reference.transform.up;
+            return reference.up;
         if (name.Contains("z") && !name.Contains("x") && !name.Contains("y"))
-            return reference.transform.forward;
+            return reference.forward;
 
         return null;
     }
 
-    private static DragPlane? GetPlaneFromGizmo(BlockProperties reference, Ray mouseRay, string name)
+    private static DragPlane? GetPlaneFromGizmo(Transform motherGizmo, Transform rotationGizmo, Ray mouseRay, string name)
     {
         var ray = mouseRay; // Use the mouse ray for intersection checks
 
         // Plane handles (XY, XZ, YZ)
         if (name.Contains("xy"))
-            return new DragPlane(new Plane(reference.transform.forward, reference.transform.position),
-                reference.transform.right, reference.transform.up);
+            return new DragPlane(new Plane(rotationGizmo.forward, motherGizmo.position),
+                rotationGizmo.right, rotationGizmo.up);
         if (name.Contains("xz"))
-            return new DragPlane(new Plane(reference.transform.up, reference.transform.position),
-                reference.transform.right, reference.transform.forward);
+            return new DragPlane(new Plane(rotationGizmo.up, motherGizmo.position),
+                rotationGizmo.right, rotationGizmo.forward);
         if (name.Contains("yz"))
-            return new DragPlane(new Plane(reference.transform.right, reference.transform.position),
-                reference.transform.up, reference.transform.forward);
+            return new DragPlane(new Plane(rotationGizmo.right, motherGizmo.position),
+                rotationGizmo.up, rotationGizmo.forward);
 
         // Axis handles (X, Y, Z)
         Vector3 axis;
         switch (name)
         {
             case "x":
-                axis = reference.transform.right;
+                axis = rotationGizmo.right;
                 break;
             case "y":
-                axis = reference.transform.up;
+                axis = rotationGizmo.up;
                 break;
             case "z":
-                axis = reference.transform.forward;
+                axis = rotationGizmo.forward;
                 break;
             default:
                 Plugin.logger.LogWarning($"Unknown gizmo name: {name}");
@@ -772,7 +774,7 @@ internal class PatchDragGizmoLocalTranslation
         // Use vector from camera to object as a stable basis
         if (!Camera.main) return null;
 
-        var toObject = (reference.transform.position - Camera.main.transform.position).normalized;
+        var toObject = (motherGizmo.position - Camera.main.transform.position).normalized;
 
         // Make a plane perpendicular to the axis and facing the camera
         var planeNormal = Vector3.Cross(axis, toObject.normalized).normalized;
@@ -789,7 +791,7 @@ internal class PatchDragGizmoLocalTranslation
             // Plugin.logger.LogWarning($"Plane is nearly parallel to mouse ray (dot = {dot}) gizmo {name}. Skipping drag.");
             return null;
 
-        return new DragPlane(new Plane(planeNormal, reference.transform.position), Vector3.zero, Vector3.zero);
+        return new DragPlane(new Plane(planeNormal, motherGizmo.position), Vector3.zero, Vector3.zero);
     }
 
 
