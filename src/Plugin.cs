@@ -984,9 +984,9 @@ public static class PatchResetRotationLocalTranslation
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
 
-        Transform referenceTransform = Plugin.Instance.referenceBlockObject.transform;
+        Transform referenceTransform = Plugin.Instance.referenceBlockObject?.transform;
 
-        if (selectedList.Count == 0 || Plugin.Instance.referenceBlockObject == null || __instance.isGrabbing)
+        if (selectedList.Count == 0 || referenceTransform == null || __instance.isGrabbing)
             return true;
 
         var before = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
