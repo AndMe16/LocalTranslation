@@ -108,7 +108,7 @@ public class Plugin : BaseUnityPlugin
                 _referenceBlock = null;
                 UseLocalGridMode = false;
 
-                logger.LogWarning("[LocTrans] Reference Block removed, local grid mode deactivated.");
+                logger.LogInfo("Reference Block removed, local grid mode deactivated.");
             }
             else
             {
@@ -126,7 +126,7 @@ public class Plugin : BaseUnityPlugin
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
                 UseLocalGridMode = false;
-                logger.LogWarning("[LocTrans] Reference Block removed, local grid mode deactivated.");
+                logger.LogInfo("Reference Block removed, local grid mode deactivated.");
                 return;
             }
 
@@ -146,6 +146,9 @@ public class Plugin : BaseUnityPlugin
         ReferenceBlockObject.SetActive(true);
 
         PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5);
+        logger.LogInfo(
+            "Reference Block set, local translation mode activated");
+
     }
 
     private void LateUpdate()
@@ -164,8 +167,9 @@ public class Plugin : BaseUnityPlugin
             var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
             ReferenceBlockObject.transform.localScale = Vector3.one * uniformScale;
         }
-        else
+        else if (_referenceBlock == null && ReferenceBlockObject)
         {
+            logger.LogInfo("Reference block is null, destroying ReferenceBlockObject.");
             Destroy(ReferenceBlockObject?.gameObject);
             ReferenceBlockObject = null;
         }
@@ -181,6 +185,9 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateReferenceBlockObject(Transform source)
     {
+
+        logger.LogInfo("Creating Reference Block Object...");
+
         if (!ReferenceBlockObject) ReferenceBlockObject = CreateReferenceGizmo();
 
         ReferenceBlockObject.transform.position = source.position;
@@ -296,6 +303,8 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateToggleLocalModeButton()
     {
+        logger.LogInfo("Creating Toggle Local Translation button...");
+
         if (!ToggleLocalTranslationButton)
             ToggleLocalTranslationButton = Instantiate(_baseButton, _baseButton.transform.parent);
 
@@ -351,6 +360,8 @@ public class Plugin : BaseUnityPlugin
         ToggleLabel.GetComponent<TextMeshProUGUI>().text = "Global Translation";
 
         ToggleLabel.SetActive(false);
+
+        logger.LogInfo("Toggle Local Translation button created successfully.");
     }
 
     internal void SetRotationToLocalMode()
@@ -361,6 +372,10 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
+        Logger.LogInfo(
+            $"Setting translation gizmos to {(UseLocalTranslationMode ? "local" : "world")} mode.");
+
+        // Get the translation gizmos from the LevelEditorCentral
         var translationGizmos = LevelEditorCentral.gizmos.translationGizmos;
         if (translationGizmos)
         {
@@ -386,7 +401,7 @@ public class Plugin : BaseUnityPlugin
 
                 _toggleLocalTranslationImage.sprite = _sprites["Pivot_LastSelected"];
 
-                // Logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
+                Logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
             }
             else
             {
@@ -395,7 +410,7 @@ public class Plugin : BaseUnityPlugin
 
                 _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
 
-                // Logger.LogInfo("TranslationGizmos set to world mode.");
+                Logger.LogInfo("TranslationGizmos set to world mode.");
             }
         }
         else
@@ -415,6 +430,8 @@ internal class PatchSelectDragLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
+        Plugin.logger.LogInfo("SelectDrag called in LEV_GizmoHandler.");
+
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(true);
@@ -432,6 +449,8 @@ internal class PatchSelectRotateLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
+        Plugin.logger.LogInfo("SelectRotate called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.IsModEnabled) return;
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(false);
         Plugin.Instance.ToggleLabel.SetActive(false);
@@ -448,6 +467,8 @@ internal class PatchResetRotationLocalRotation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
+        Plugin.logger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
+
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
     }
@@ -463,6 +484,8 @@ internal class PatchActivateLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
+        Plugin.logger.LogInfo("Activate called in LEV_GizmoHandler.");
+
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
     }
@@ -477,6 +500,9 @@ internal class PatchActiveAllGizmosLocalTranslation
     private static void Postfix(LEV_GizmoHandler __instance)
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+
+        Plugin.logger.LogInfo("ActiveAllGizmos called in LEV_GizmoHandler.");
+
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
     }
@@ -492,8 +518,11 @@ internal class PatchGizmoJustGotClickedLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
+        Plugin.logger.LogInfo("GizmoJustGotClicked called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
         // Reset the last mouse position to the current mouse position
+
         PatchDragGizmoLocalTranslation.originPosition = null;
         PatchDragGizmoLocalTranslation.initialDragOffset = null;
     }
@@ -507,6 +536,10 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static void Postfix(LEV_GizmoHandler __instance)
     {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+
+        Plugin.logger.LogInfo("GizmoJustGotReleased called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
         PatchDragGizmoLocalTranslation.ClearOriginMarker();
     }
@@ -521,6 +554,9 @@ internal class PatchDeactivateLocalTranslation
     private static void Postfix(LEV_GizmoHandler __instance)
     {
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
+
+        Plugin.logger.LogInfo("Deactivate called in LEV_GizmoHandler.");
+
         // Reset translationGizmos rotation
         __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
     }
@@ -589,8 +625,11 @@ internal class PatchDragGizmoLocalTranslation
         var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.translationGizmos.transform;
 
         if (!originPosition.HasValue)
+        {
             if (motherGizmo)
             {
+                Plugin.logger.LogInfo($"Origin position not set, using motherGizmo position: {motherGizmo.position}");
+
                 originPosition = motherGizmo.position;
                 if (originPosition != null)
                 {
@@ -601,6 +640,8 @@ internal class PatchDragGizmoLocalTranslation
                     _gotSnapped = false;
                 }
             }
+        }
+            
 
         if (_dragPlane == null) return false;
 
@@ -611,6 +652,7 @@ internal class PatchDragGizmoLocalTranslation
         // On initial click, store offset between pivot and where mouse hit the plane
         if (!initialDragOffset.HasValue)
         {
+            Plugin.logger.LogInfo($"Initial drag offset not set, calculating from hit point: {hitPoint}");
             if (originPosition != null) initialDragOffset = hitPoint - originPosition.Value;
             return false;
         }
@@ -708,6 +750,8 @@ internal class PatchDragGizmoLocalTranslation
 
     private static void CreateOriginMarker(Vector3 position)
     {
+        Plugin.logger.LogInfo($"Creating origin marker at position: {position}");
+
         if (_originMarker) Object.Destroy(_originMarker);
 
         _originMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -738,6 +782,8 @@ internal class PatchDragGizmoLocalTranslation
 
     internal static void ClearOriginMarker()
     {
+        Plugin.logger.LogInfo("Clearing origin marker...");
+
         if (_originMarker)
         {
             Object.Destroy(_originMarker);
@@ -959,7 +1005,10 @@ public static class PatchSetMotherPositionLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled || __instance.isDragging) return;
+
+        Plugin.logger.LogInfo("SetMotherPosition called in LEV_GizmoHandler.");
+
         // Reset the last mouse position to the current mouse position
         PatchDragGizmoLocalTranslation.originPosition = null;
         PatchDragGizmoLocalTranslation.initialDragOffset = null;
@@ -974,6 +1023,9 @@ public static class PatchSnapToGridXZLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
+
+        Plugin.logger.LogInfo("SnapToGridXZ called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
@@ -989,6 +1041,9 @@ public static class PatchSnapToGridYLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
+
+        Plugin.logger.LogInfo("SnapToGridY called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
@@ -1004,6 +1059,9 @@ public static class PatchResetRotationLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
+
+        Plugin.logger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
+
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
@@ -1013,7 +1071,10 @@ public static class PatchResetRotationLocalTranslation
         var referenceTransform = Plugin.Instance.ReferenceBlockObject?.transform;
 
         if (selectedList.Count == 0 || !referenceTransform || __instance.isGrabbing)
+        {
+            Plugin.logger.LogWarning("No blocks selected or reference transform not set, skipping ResetRotation.");
             return true;
+        }
 
         var before = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
 
@@ -1038,6 +1099,8 @@ public static class PatchResetRotationLocalTranslation
             "Gizmo_LocalSnap"
         );
 
+        Plugin.logger.LogInfo("ResetRotation completed in LEV_GizmoHandler.");
+
         return false; // Skip the original method
     }
 }
@@ -1047,11 +1110,17 @@ public static class LocalGridSnapUtils
     // ReSharper disable once InconsistentNaming
     public static bool SnapToLocalGrid(LEV_GizmoHandler __instance, bool snapXZ, bool snapY)
     {
+
+        Plugin.logger.LogInfo("SnapToLocalGrid called in LEV_GizmoHandler.");
+
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
 
         if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
+        {
+            Plugin.logger.LogWarning("No blocks selected or reference transform not set, skipping SnapToLocalGrid.");
             return true;
+        }
 
         var refTransform = Plugin.Instance.ReferenceBlockObject.transform;
 
@@ -1088,6 +1157,8 @@ public static class LocalGridSnapUtils
                 selectedList, selectionStr, selectionStr),
             "Gizmo_LocalSnap"
         );
+
+        Plugin.logger.LogInfo("SnapToLocalGrid completed in LEV_GizmoHandler.");
 
         return false;
     }
@@ -1184,47 +1255,46 @@ public static class PatchGrabGizmoLocalTranslation
         var localOffset = hitPoint;
 
         if (_lastAxisPoint == null) return false;
+        
+        var rawMove = localOffset - _lastAxisPoint.Value;
+
+        var snappedMove = Vector3.zero;
+
+        var yScroll = SetYGridStep(__instance);
+        if (Mathf.Abs(yScroll) > 0f)
         {
-            var rawMove = localOffset - _lastAxisPoint.Value;
+            var scrollOffset = planeNormal * yScroll;
+            snappedMove += scrollOffset;
 
-            var snappedMove = Vector3.zero;
+            _totalScrollOffset += scrollOffset;
 
-            var yScroll = SetYGridStep(__instance);
-            if (Mathf.Abs(yScroll) > 0f)
-            {
-                var scrollOffset = planeNormal * yScroll;
-                snappedMove += scrollOffset;
-
-                _totalScrollOffset += scrollOffset;
-
-                Camera.main.transform.position += scrollOffset;
-            }
-
-            var xyGridStep = __instance.gridXZ;
-
-
-            foreach (var axis in planeAxes)
-            {
-                // Determine a grid step based on the axis and gizmo name
-                var moveAmount = Vector3.Dot(rawMove, axis);
-                var snapped = xyGridStep > 0f ? Mathf.Round(moveAmount / xyGridStep) * xyGridStep : moveAmount;
-                snappedMove += axis * snapped;
-            }
-
-            // Apply movement to the selected block
-
-            __instance.motherGizmo.transform.position += snappedMove;
-            __instance.dragGizmoOrigin = __instance.motherGizmo.position;
-            __instance.central.selection.TranslatePositions(snappedMove);
-
-            if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && xyGridStep > 0f)
-            {
-                AudioEvents.MenuHover1.Play();
-                __instance.rememberTranslation = __instance.motherGizmo.transform.position;
-            }
-
-            _lastAxisPoint = _lastAxisPoint.Value + snappedMove;
+            Camera.main.transform.position += scrollOffset;
         }
+
+        var xyGridStep = __instance.gridXZ;
+
+
+        foreach (var axis in planeAxes)
+        {
+            // Determine a grid step based on the axis and gizmo name
+            var moveAmount = Vector3.Dot(rawMove, axis);
+            var snapped = xyGridStep > 0f ? Mathf.Round(moveAmount / xyGridStep) * xyGridStep : moveAmount;
+            snappedMove += axis * snapped;
+        }
+
+        // Apply movement to the selected block
+
+        __instance.motherGizmo.transform.position += snappedMove;
+        __instance.dragGizmoOrigin = __instance.motherGizmo.position;
+        __instance.central.selection.TranslatePositions(snappedMove);
+
+        if (__instance.motherGizmo.transform.position != __instance.rememberTranslation && xyGridStep > 0f)
+        {
+            AudioEvents.MenuHover1.Play();
+            __instance.rememberTranslation = __instance.motherGizmo.transform.position;
+        }
+
+        _lastAxisPoint = _lastAxisPoint.Value + snappedMove;
 
         return false;
     }
