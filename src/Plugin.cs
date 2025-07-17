@@ -1326,6 +1326,37 @@ public static class PatchGizmoHandlerUpdateLocalTranslation
     }
 }
 
+// RotateBlocks
+[HarmonyPatch(typeof(LEV_RotateFlip), nameof(LEV_RotateFlip.RotateBlocks))]
+[HarmonyPatch(new Type[] { typeof(Vector3), typeof(float) })]
+class PatchRotateBlocks2ParamLocalTranslation
+{
+    static void Prefix(ref Vector3 upVector, float angle)
+    {
+        if (!Plugin.Instance.LevelEditorCentral)
+        {
+            Plugin.logger.LogWarning("LevelEditorCentral.Instance is null in RotateBlocks prefix.");
+            return;
+        }
+
+        if ((Plugin.Instance.UseLocalTranslationMode || Plugin.Instance.UseLocalGridMode) && Plugin.Instance.IsModEnabled)
+        {
+            Plugin.logger.LogInfo(
+                $"RotateBlocks called with upVector: {upVector}, angle: {angle} in local translation mode.");
+
+            if (Plugin.Instance.LevelEditorCentral.selection.list.Count > 0)
+            {
+
+                // Modify the upVector
+                upVector = Plugin.Instance.LevelEditorCentral.selection.list[^1].transform.up;
+
+                Plugin.logger.LogInfo($"Modified upVector to: {upVector}");
+            }
+        }
+    }
+}
+
+
 public class ModConfig : MonoBehaviour
 {
     public static ConfigEntry<KeyCode> toggleMode;
