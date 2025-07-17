@@ -54,6 +54,8 @@ public class Plugin : BaseUnityPlugin
     internal bool UseLocalGridMode;
     internal bool UseLocalTranslationMode;
 
+    internal Camera MainCamera;
+
     public static Plugin Instance { get; private set; }
 
     private void Awake()
@@ -161,9 +163,8 @@ public class Plugin : BaseUnityPlugin
 
             // scale so that screen‐space size stays roughly constant
             // ReSharper disable once Unity.PerformanceCriticalCodeCameraMain
-            var cam = Camera.main;
-            if (!cam) return;
-            var dist = Vector3.Distance(cam.transform.position, ReferenceBlockObject.transform.position);
+            if (!MainCamera) return;
+            var dist = Vector3.Distance(MainCamera.transform.position, ReferenceBlockObject.transform.position);
             var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
             ReferenceBlockObject.transform.localScale = Vector3.one * uniformScale;
         }
@@ -286,6 +287,7 @@ public class Plugin : BaseUnityPlugin
 
             IsModEnabled = true;
             UseLocalGridMode = false; // Default to global translation mode
+            MainCamera = Camera.main;
             // Logger.LogInfo("Level Editor scene loaded — mod activated.");
         }
         else
@@ -296,6 +298,7 @@ public class Plugin : BaseUnityPlugin
             _toggleLocalTranslationImage = null;
             CustomButton = null;
             ToggleLabel = null;
+            MainCamera = null;
 
             // Logger.LogInfo("Not in the Level Editor scene — mod inactive.");
         }
@@ -583,9 +586,9 @@ internal class PatchDragGizmoLocalTranslation
 
         var gizmoName = currentGizmo.name.Replace("Gizmo", "").ToLower();
 
-        if (!Camera.main) return false;
+        if (!Plugin.Instance.MainCamera) return false;
 
-        var mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        var mouseRay = Plugin.Instance.MainCamera.ScreenPointToRay(Input.mousePosition);
 
         var motherGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.motherGizmo;
         // var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
@@ -809,9 +812,9 @@ internal class PatchDragGizmoLocalTranslation
         }
 
         // Use vector from camera to object as a stable basis
-        if (!Camera.main) return null;
+        if (!Plugin.Instance.MainCamera) return null;
 
-        var toObject = (motherGizmo.position - Camera.main.transform.position).normalized;
+        var toObject = (motherGizmo.position - Plugin.Instance.MainCamera.transform.position).normalized;
 
         // Make a plane perpendicular to the axis and facing the camera
         var planeNormal = Vector3.Cross(axis, toObject.normalized).normalized;
@@ -876,9 +879,9 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
     {
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return true;
 
-        if (Camera.main)
+        if (Plugin.Instance.MainCamera)
         {
-            var camTransform = Camera.main.transform;
+            var camTransform = Plugin.Instance.MainCamera.transform;
             var gizmoRoot = __instance.translationGizmos.transform;
 
             // Calculate a view direction in a local gizmo space
@@ -1170,8 +1173,8 @@ public static class PatchGrabGizmoLocalTranslation
         var dragPlane = new Plane(planeNormal, planeOrigin);
 
         // Cast a ray from the mouse to the plane
-        if (!Camera.main) return false;
-        var mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (!Plugin.Instance.MainCamera) return false;
+        var mouseRay = Plugin.Instance.MainCamera.ScreenPointToRay(Input.mousePosition);
         Vector3 hitPoint;
 
         // Check if the ray intersects with the drag plane
@@ -1238,7 +1241,7 @@ public static class PatchGrabGizmoLocalTranslation
 
             _totalScrollOffset += scrollOffset;
 
-            Camera.main.transform.position += scrollOffset;
+            Plugin.Instance.MainCamera.transform.position += scrollOffset;
         }
 
         var xyGridStep = __instance.gridXZ;
