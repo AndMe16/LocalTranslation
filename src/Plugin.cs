@@ -23,8 +23,8 @@ public class Plugin : BaseUnityPlugin
 {
     // Only patch the LevelEditor2 scene
     private const string TargetSceneName = "LevelEditor2";
-    private const float MaxReferenceSize = 6f; // maximum size of the reference block in world units
-    private const float SizeOnScreen = 0.17f; // world‐units per unit of distance 
+    private const float MaxReferenceSize = 4f; // maximum size of the reference block in world units
+    private const float SizeOnScreen = 0.15f; // world‐units per unit of distance 
     internal static ManualLogSource logger;
     internal static readonly Color NormalColor = new(1f, 0.572549f, 0f, 1f);
     internal static readonly Color WarningColor = new(0.988f, 0.27f, 0f, 1f); // light red
@@ -162,7 +162,6 @@ public class Plugin : BaseUnityPlugin
             ReferenceBlockObject.transform.rotation = _referenceBlock.rotation;
 
             // scale so that screen‐space size stays roughly constant
-            // ReSharper disable once Unity.PerformanceCriticalCodeCameraMain
             if (!MainCamera) return;
             var dist = Vector3.Distance(MainCamera.transform.position, ReferenceBlockObject.transform.position);
             var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
@@ -553,6 +552,9 @@ internal class PatchDragGizmoLocalTranslation
     private static readonly int DstBlend = Shader.PropertyToID("_DstBlend");
     private static readonly int ZWrite = Shader.PropertyToID("_ZWrite");
 
+    private static readonly float SizeOnScreen = 0.08f;
+    private static readonly float MaxReferenceSize = 10f;
+
     [UsedImplicitly]
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
@@ -605,13 +607,20 @@ internal class PatchDragGizmoLocalTranslation
                 {
                     // Spawn the visual indicator
                     CreateOriginMarker(originPosition.Value);
+
                     _dragPlane = GetPlaneFromGizmo(motherGizmo, rotationGizmo, mouseRay, gizmoName);
 
                     _gotSnapped = false;
                 }
             }
         }
-            
+
+        // Size of the marker
+        var dist = Vector3.Distance(Plugin.Instance.MainCamera.transform.position, originPosition.Value);
+        var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
+        _originMarker.transform.localScale = Vector3.one * uniformScale;
+
+
 
         if (_dragPlane == null) return false;
 
@@ -726,7 +735,7 @@ internal class PatchDragGizmoLocalTranslation
 
         _originMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         _originMarker.transform.position = position;
-        _originMarker.transform.localScale = Vector3.one * 3f; // Small sphere
+        _originMarker.transform.localScale = Vector3.one; // Small sphere
 
         var renderer = _originMarker.GetComponent<Renderer>();
         if (renderer)
