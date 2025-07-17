@@ -953,4 +953,23 @@ namespace LocalTranslation.InternalPatches
             }
         }
     }
+
+
+    // UpdateTransform
+    [HarmonyPatch(typeof(LEV_InspectorGUICreator), "UpdateTransform")]
+    public static class PatchUpdateTransformLocalTranslation
+    {
+        [UsedImplicitly]
+        // ReSharper disable once InconsistentNaming
+        private static void Postfix(LEV_InspectorGUICreator __instance, bool resetOnly, bool isRealTime)
+        {
+            if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+
+            if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled && !isRealTime && !resetOnly)
+            {
+                Plugin.Instance.SetRotationToLocalMode();
+            }
+
+        }
+    }
 }
