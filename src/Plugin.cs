@@ -474,9 +474,10 @@ internal class PatchResetRotationLocalRotation
     }
 }
 
-// Activate
-[HarmonyPatch(typeof(LEV_GizmoHandler), "Activate")]
-internal class PatchActivateLocalTranslation
+
+// GoOutOfGMode
+[HarmonyPatch(typeof(LEV_GizmoHandler), "GoOutOfGMode")]
+internal class PatchGoOutOfGModeLocalTranslation
 {
     [UsedImplicitly]
     // ReSharper disable once InconsistentNaming
@@ -484,24 +485,7 @@ internal class PatchActivateLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        Plugin.logger.LogInfo("Activate called in LEV_GizmoHandler.");
-
-        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
-            Plugin.Instance.SetRotationToLocalMode();
-    }
-}
-
-// ActiveAllGizmos
-[HarmonyPatch(typeof(LEV_GizmoHandler), "ActiveAllGizmos")]
-internal class PatchActiveAllGizmosLocalTranslation
-{
-    [UsedImplicitly]
-    // ReSharper disable once InconsistentNaming
-    private static void Postfix(LEV_GizmoHandler __instance)
-    {
-        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
-
-        Plugin.logger.LogInfo("ActiveAllGizmos called in LEV_GizmoHandler.");
+        Plugin.logger.LogInfo("GoOutOfGMode called in LEV_GizmoHandler.");
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
@@ -542,23 +526,6 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
         PatchDragGizmoLocalTranslation.ClearOriginMarker();
-    }
-}
-
-// Deactivate
-[HarmonyPatch(typeof(LEV_GizmoHandler), "Deactivate")]
-internal class PatchDeactivateLocalTranslation
-{
-    [UsedImplicitly]
-    // ReSharper disable once InconsistentNaming
-    private static void Postfix(LEV_GizmoHandler __instance)
-    {
-        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
-
-        Plugin.logger.LogInfo("Deactivate called in LEV_GizmoHandler.");
-
-        // Reset translationGizmos rotation
-        __instance.translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0);
     }
 }
 
@@ -1012,6 +979,9 @@ public static class PatchSetMotherPositionLocalTranslation
         // Reset the last mouse position to the current mouse position
         PatchDragGizmoLocalTranslation.originPosition = null;
         PatchDragGizmoLocalTranslation.initialDragOffset = null;
+
+        // Set the translation gizmos to local mode
+        Plugin.Instance.SetRotationToLocalMode();
     }
 }
 
