@@ -1,18 +1,15 @@
-﻿using BepInEx;
-using BepInEx.Configuration;
-using BepInEx.Logging;
-using FMODSyntax;
-using HarmonyLib;
-using JetBrains.Annotations;
-using LocalTranslation.ExternalPatches;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BepInEx;
+using BepInEx.Configuration;
+using BepInEx.Logging;
+using HarmonyLib;
+using LocalTranslation.ExternalPatches;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -50,13 +47,13 @@ public class Plugin : BaseUnityPlugin
     internal bool IsModEnabled;
     internal LEV_LevelEditorCentral LevelEditorCentral;
 
+    internal Camera MainCamera;
+
     internal GameObject ReferenceBlockObject;
     internal GameObject ToggleLabel;
     internal GameObject ToggleLocalTranslationButton;
     internal bool UseLocalGridMode;
     internal bool UseLocalTranslationMode;
-
-    internal Camera MainCamera;
 
     public static Plugin Instance { get; private set; }
 
@@ -68,16 +65,12 @@ public class Plugin : BaseUnityPlugin
         _harmony = new Harmony("andme123.localtranslation");
 
         foreach (var type in Assembly.GetExecutingAssembly().GetTypes())
-        {
             if (type.Namespace == "LocalTranslation.InternalPatches") // or use an attribute tag
-            {
                 _harmony.PatchAll(type);
-            }
-        }
 
 
         // Conditionally patch BPX
-        TryPatchBPX();
+        TryPatchBpx();
 
         logger.LogInfo("Plugin andme123.localtranslation is loaded!");
 
@@ -163,7 +156,6 @@ public class Plugin : BaseUnityPlugin
         PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5);
         logger.LogInfo(
             "Reference Block set, local translation mode activated");
-
     }
 
     private void LateUpdate()
@@ -180,7 +172,7 @@ public class Plugin : BaseUnityPlugin
             var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
             ReferenceBlockObject.transform.localScale = Vector3.one * uniformScale;
         }
-        else if (_referenceBlock == null && ReferenceBlockObject)
+        else if (!_referenceBlock && ReferenceBlockObject)
         {
             logger.LogInfo("Reference block is null, destroying ReferenceBlockObject.");
             Destroy(ReferenceBlockObject?.gameObject);
@@ -198,7 +190,6 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateReferenceBlockObject(Transform source)
     {
-
         logger.LogInfo("Creating Reference Block Object...");
 
         if (!ReferenceBlockObject) ReferenceBlockObject = CreateReferenceGizmo();
@@ -431,18 +422,15 @@ public class Plugin : BaseUnityPlugin
         }
     }
 
-    void TryPatchBPX()
+    private void TryPatchBpx()
     {
-        Type bpxType = AccessTools.TypeByName("BPX.BPXUtils");
-        if (bpxType != null)
-        {
-            var method = AccessTools.Method(bpxType, "ConvertLocalToWorldVectors");
-            var prefix = new HarmonyMethod(typeof(PatchConvertLocalToWorldVectorsLocalTranslation).GetMethod("Prefix"));
-            _harmony.Patch(method, prefix: prefix);
-        }
+        var bpxType = AccessTools.TypeByName("BPX.BPXUtils");
+        if (bpxType == null) return;
+        var method = AccessTools.Method(bpxType, "ConvertLocalToWorldVectors");
+        var prefix = new HarmonyMethod(typeof(PatchConvertLocalToWorldVectorsLocalTranslation).GetMethod("Prefix"));
+        _harmony.Patch(method, prefix);
     }
 }
-
 
 public class ModConfig : MonoBehaviour
 {

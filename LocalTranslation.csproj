@@ -16,15 +16,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
-        <PackageReference Include="BepInEx.Core" Version="5.*" />
-        <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
-        <PackageReference Include="UnityEngine.Modules" Version="2021.3.45" IncludeAssets="compile" />
-        <PackageReference Include="Zeepkist.GameLibs" Version="*" />
+        <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all"/>
+        <PackageReference Include="BepInEx.Core" Version="5.*"/>
+        <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*"/>
+        <PackageReference Include="UnityEngine.Modules" Version="2021.3.45" IncludeAssets="compile"/>
+        <PackageReference Include="Zeepkist.GameLibs" Version="*"/>
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
-        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.2" PrivateAssets="all"/>
     </ItemGroup>
 
     <!-- Define ModDirectory based on OS -->
@@ -44,18 +44,18 @@
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
         <!-- Clean existing mod directory -->
-        <RemoveDir Directories="$(ModDirectory)" />
-        <MakeDir Directories="$(ModDirectory)" />
+        <RemoveDir Directories="$(ModDirectory)"/>
+        <MakeDir Directories="$(ModDirectory)"/>
 
         <!-- Copy main DLL + PDB -->
-        <Copy SourceFiles="$(TargetDir)LocalTranslation.dll" DestinationFiles="$(ModDirectory)/LocalTranslation-$(Version).dll" />
-        <Copy SourceFiles="$(TargetDir)LocalTranslation.pdb" DestinationFiles="$(ModDirectory)/LocalTranslation-$(Version).pdb" />
+        <Copy SourceFiles="$(TargetDir)LocalTranslation.dll" DestinationFiles="$(ModDirectory)/LocalTranslation-$(Version).dll"/>
+        <Copy SourceFiles="$(TargetDir)LocalTranslation.pdb" DestinationFiles="$(ModDirectory)/LocalTranslation-$(Version).pdb"/>
 
         <!-- Copy Resources -->
         <ItemGroup>
-            <ResourceFiles Include="$(ProjectDir)Resources/**/*.*" />
+            <ResourceFiles Include="$(ProjectDir)Resources/**/*.*"/>
         </ItemGroup>
-        <Copy SourceFiles="@(ResourceFiles)" DestinationFolder="$(ModDirectory)/Resources/%(RecursiveDir)" />
+        <Copy SourceFiles="@(ResourceFiles)" DestinationFolder="$(ModDirectory)/Resources/%(RecursiveDir)"/>
     </Target>
 
 </Project>
