@@ -83,7 +83,7 @@ public class Plugin : BaseUnityPlugin
             }
             catch (Exception ex)
             {
-                Logger.LogError($"OnSceneLoaded exception: {ex}");
+                logger.LogError($"OnSceneLoaded exception: {ex}");
             }
         };
     }
@@ -99,7 +99,7 @@ public class Plugin : BaseUnityPlugin
             !LevelEditorCentral.gizmos.isGrabbing && LevelEditorCentral.selection.list.Count != 0)
         {
             UseLocalTranslationMode = !UseLocalTranslationMode;
-            Logger.LogInfo($"Local Translation Mode: {(UseLocalTranslationMode ? "Enabled" : "Disabled")}");
+            logger.LogInfo($"Local Translation Mode: {(UseLocalTranslationMode ? "Enabled" : "Disabled")}");
 
             SetRotationToLocalMode();
         }
@@ -256,7 +256,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!LevelEditorCentral)
             {
-                Logger.LogError("LEV_LevelEditorCentral not found in the Level Editor scene.");
+                logger.LogError("LEV_LevelEditorCentral not found in the Level Editor scene.");
                 return;
             }
 
@@ -266,7 +266,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!_baseButton)
             {
-                Logger.LogError("Base button for toggling global/local mode not found.");
+                logger.LogError("Base button for toggling global/local mode not found.");
                 return;
             }
 
@@ -274,7 +274,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!_rotateFlip)
             {
-                Logger.LogError("LEV_RotateFlip component not found in Level Editor Central.");
+                logger.LogError("LEV_RotateFlip component not found in Level Editor Central.");
                 return;
             }
 
@@ -282,7 +282,7 @@ public class Plugin : BaseUnityPlugin
                 "Level Editor Central/Canvas/GameView/Gizmo Mode (true)--------------/_Top Right/Global Rotation Label");
             if (!_baseLabel)
             {
-                Logger.LogError("Base label for toggling global/local mode not found.");
+                logger.LogError("Base label for toggling global/local mode not found.");
                 return;
             }
 
@@ -291,7 +291,6 @@ public class Plugin : BaseUnityPlugin
             IsModEnabled = true;
             UseLocalGridMode = false; // Default to global translation mode
             MainCamera = Camera.main;
-            // Logger.LogInfo("Level Editor scene loaded — mod activated.");
         }
         else
         {
@@ -303,7 +302,6 @@ public class Plugin : BaseUnityPlugin
             ToggleLabel = null;
             MainCamera = null;
 
-            // Logger.LogInfo("Not in the Level Editor scene — mod inactive.");
         }
     }
 
@@ -321,7 +319,7 @@ public class Plugin : BaseUnityPlugin
 
         if (!_toggleLocalTranslationImage)
         {
-            Logger.LogError("Global Rotation Toggle button image not found.");
+            logger.LogError("Global Rotation Toggle button image not found.");
             return;
         }
 
@@ -334,7 +332,6 @@ public class Plugin : BaseUnityPlugin
             CustomButton.onClick = new UnityEvent(); // clears all listeners
             CustomButton.onClick.AddListener(() =>
             {
-                Logger.LogInfo("Toggling Local Translation Mode.");
 
                 UseLocalTranslationMode = !UseLocalTranslationMode;
 
@@ -374,7 +371,7 @@ public class Plugin : BaseUnityPlugin
     {
         if (!LevelEditorCentral)
         {
-            Logger.LogError("LEV_LevelEditorCentral is not initialized.");
+            logger.LogError("LEV_LevelEditorCentral is not initialized.");
             return;
         }
 
@@ -383,16 +380,16 @@ public class Plugin : BaseUnityPlugin
         if (translationGizmos)
         {
             // Set gizmo rotation based on local mode
-            if (UseLocalTranslationMode)
+            if (UseLocalTranslationMode && !LevelEditorCentral.gizmos.isGrabbing)
             {
                 var selectionList = LevelEditorCentral.selection.list;
                 switch (selectionList.Count)
                 {
-                    // Logger.LogWarning("No objects selected for local translation mode.");
+                    // logger.LogWarning("No objects selected for local translation mode.");
                     case 0:
                         return;
                     case > 1:
-                        // Logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
+                        // logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
                         break;
                 }
 
@@ -404,21 +401,25 @@ public class Plugin : BaseUnityPlugin
 
                 _toggleLocalTranslationImage.sprite = _sprites["Pivot_LastSelected"];
 
-                Logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
+                //logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
             }
-            else
+            else if (!LevelEditorCentral.gizmos.isGrabbing)
             {
                 // Set gizmos to world mode
                 translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0); // Reset rotation to world space
 
                 _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
 
-                Logger.LogInfo("TranslationGizmos set to world mode.");
+                logger.LogInfo("TranslationGizmos set to world mode.");
+            }
+            else
+            {
+                return; // Do not change rotation if gizmos are being grabbed
             }
         }
         else
         {
-            Logger.LogWarning("TranslationGizmos not found");
+            logger.LogWarning("TranslationGizmos not found");
         }
     }
 
