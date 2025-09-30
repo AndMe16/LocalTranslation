@@ -10,7 +10,7 @@ using Object = UnityEngine.Object;
 
 namespace LocalTranslation.InternalPatches;
 
-// SelectDrag
+// LEV_GizmoHandler_SelectDrag
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SelectDrag")]
 internal class PatchSelectDragLocalTranslation
 {
@@ -29,7 +29,7 @@ internal class PatchSelectDragLocalTranslation
     }
 }
 
-// SelectRotate
+// LEV_GizmoHandler_SelectRotate
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SelectRotate")]
 internal class PatchSelectRotateLocalTranslation
 {
@@ -46,7 +46,7 @@ internal class PatchSelectRotateLocalTranslation
     }
 }
 
-// ResetRotation
+// LEV_GizmoHandler_ResetRotation
 [HarmonyPatch(typeof(LEV_GizmoHandler), "ResetRotation")]
 internal class PatchResetRotationLocalRotation
 {
@@ -64,7 +64,7 @@ internal class PatchResetRotationLocalRotation
     }
 }
 
-// GoOutOfGMode
+// LEV_GizmoHandler_GoOutOfGMode
 [HarmonyPatch(typeof(LEV_GizmoHandler), "GoOutOfGMode")]
 internal class PatchGoOutOfGModeLocalTranslation
 {
@@ -82,7 +82,7 @@ internal class PatchGoOutOfGModeLocalTranslation
     }
 }
 
-// GizmoJustGotClicked
+// LEV_GizmoHandler_GizmoJustGotClicked
 [HarmonyPatch(typeof(LEV_GizmoHandler), "GizmoJustGotClicked")]
 internal class PatchGizmoJustGotClickedLocalTranslation
 {
@@ -100,7 +100,7 @@ internal class PatchGizmoJustGotClickedLocalTranslation
     }
 }
 
-// GizmoJustGotReleased
+// LEV_GizmoHandler_GizmoJustGotReleased
 [HarmonyPatch(typeof(LEV_GizmoHandler), "GizmoJustGotReleased")]
 internal class PatchGizmoJustGotReleasedLocalTranslation
 {
@@ -117,7 +117,7 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
     }
 }
 
-// DragGizmo
+// LEV_GizmoHandler_DragGizmo
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DragGizmo")]
 internal class PatchDragGizmoLocalTranslation
 {
@@ -179,7 +179,6 @@ internal class PatchDragGizmoLocalTranslation
         var mouseRay = Plugin.Instance.MainCamera.ScreenPointToRay(Input.mousePosition);
 
         var motherGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.motherGizmo;
-        // var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
         var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.translationGizmos.transform;
 
         if (!OriginPosition.HasValue)
@@ -438,6 +437,7 @@ internal class PatchDragGizmoLocalTranslation
     }
 }
 
+// LEV_MotherGizmoFlipper_Update
 [HarmonyPatch(typeof(LEV_MotherGizmoFlipper), "Update")]
 public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
 {
@@ -465,6 +465,7 @@ public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
     }
 }
 
+// LEV_GizmoHandler_DisableGizmosOnDistance
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DisableGizmosOnDistance")]
 public static class PatchDisableGizmosOnDistanceLocalTranslation
 {
@@ -525,6 +526,7 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
     }
 }
 
+// LEV_CustomButton_SetToDefaultColor
 [HarmonyPatch(typeof(LEV_CustomButton), "SetToDefaultColor")]
 public static class PatchSetToDefaultColorLocalTranslation
 {
@@ -560,7 +562,7 @@ public static class PatchSetToDefaultColorLocalTranslation
     }
 }
 
-// SetMotherPosition
+// LEV_GizmoHandler_SetMotherPosition
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SetMotherPosition")]
 public static class PatchSetMotherPositionLocalTranslation
 {
@@ -583,7 +585,7 @@ public static class PatchSetMotherPositionLocalTranslation
     }
 }
 
-// SnapToGridXY
+// LEV_GizmoHandler_SnapToGridXY
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SnapToGridXZ")]
 public static class PatchSnapToGridXZLocalTranslation
 {
@@ -600,7 +602,7 @@ public static class PatchSnapToGridXZLocalTranslation
     }
 }
 
-// SnapToGridY
+// LEV_GizmoHandler_SnapToGridY
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SnapToGridY")]
 public static class PatchSnapToGridYLocalTranslation
 {
@@ -617,7 +619,7 @@ public static class PatchSnapToGridYLocalTranslation
     }
 }
 
-// ResetRotation
+// LEV_GizmoHandler_ResetRotation
 [HarmonyPatch(typeof(LEV_GizmoHandler), "ResetRotation")]
 public static class PatchResetRotationLocalTranslation
 {
@@ -674,6 +676,7 @@ public static class PatchResetRotationLocalTranslation
     }
 }
 
+// LocalGridSnap Helper Class
 public static class LocalGridSnapUtils
 {
     // ReSharper disable once InconsistentNaming
@@ -731,7 +734,7 @@ public static class LocalGridSnapUtils
     }
 }
 
-// GrabGizmo
+// LEV_GizmoHandler_GrabGizmo
 [HarmonyPatch(typeof(LEV_GizmoHandler), "GrabGizmo")]
 public static class PatchGrabGizmoLocalTranslation
 {
@@ -881,7 +884,7 @@ public static class PatchGrabGizmoLocalTranslation
     }
 }
 
-// Update Gizmo_Handler
+// LEV_GizmoHandler_Update
 [HarmonyPatch(typeof(LEV_GizmoHandler), "Update")]
 public static class PatchGizmoHandlerUpdateLocalTranslation
 {
@@ -911,7 +914,7 @@ public static class PatchGizmoHandlerUpdateLocalTranslation
     }
 }
 
-// RotateBlocks 2Params
+// LEV_RotateFlip_RotateBlocks 2Params (Vector3 upVector, float angle)
 [HarmonyPatch(typeof(LEV_RotateFlip), nameof(LEV_RotateFlip.RotateBlocks))]
 [HarmonyPatch([typeof(Vector3), typeof(float)])]
 internal class PatchRotateBlocks2ParamLocalTranslation
@@ -946,7 +949,7 @@ internal class PatchRotateBlocks2ParamLocalTranslation
     }
 }
 
-// UpdateTransform
+// LEV_InspectorGUICreator_UpdateTransform
 [HarmonyPatch(typeof(LEV_InspectorGUICreator), "UpdateTransform")]
 public static class PatchUpdateTransformLocalTranslation
 {
