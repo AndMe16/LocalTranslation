@@ -24,7 +24,7 @@ public class Plugin : BaseUnityPlugin
     private const string TargetSceneName = "LevelEditor2";
     private const float MaxReferenceSize = 4f; // maximum size of the reference block in world units
     private const float SizeOnScreen = 0.15f; // world‐units per unit of distance 
-    internal static ManualLogSource logger;
+    internal static ManualLogSource MyLogger;
     internal static readonly Color NormalColor = new(1f, 0.572549f, 0f, 1f);
     internal static readonly Color WarningColor = new(0.988f, 0.27f, 0f, 1f); // light red
     private readonly Dictionary<string, Sprite> _sprites = [];
@@ -60,7 +60,7 @@ public class Plugin : BaseUnityPlugin
     private void Awake()
     {
         Instance = this;
-        logger = Logger;
+        MyLogger = Logger;
 
         _harmony = new Harmony("andme123.localtranslation");
 
@@ -72,7 +72,7 @@ public class Plugin : BaseUnityPlugin
         // Conditionally patch BPX
         TryPatchBpx();
 
-        logger.LogInfo("Plugin andme123.localtranslation is loaded!");
+        MyLogger.LogInfo("Plugin andme123.localtranslation is loaded!");
 
         ModConfig.Initialize(Config);
         SceneManager.sceneLoaded += (scene, mode) =>
@@ -83,7 +83,7 @@ public class Plugin : BaseUnityPlugin
             }
             catch (Exception ex)
             {
-                logger.LogError($"OnSceneLoaded exception: {ex}");
+                MyLogger.LogError($"OnSceneLoaded exception: {ex}");
             }
         };
     }
@@ -95,17 +95,17 @@ public class Plugin : BaseUnityPlugin
         if (!LevelEditorCentral) return;
 
         // Check if the user has toggled the local translation mode
-        if (Input.GetKeyDown(ModConfig.toggleMode.Value) && !LevelEditorCentral.input.inputLocked &&
+        if (Input.GetKeyDown(ModConfig.ToggleMode.Value) && !LevelEditorCentral.input.inputLocked &&
             !LevelEditorCentral.gizmos.isGrabbing && LevelEditorCentral.selection.list.Count != 0)
         {
             UseLocalTranslationMode = !UseLocalTranslationMode;
-            logger.LogInfo($"Local Translation Mode: {(UseLocalTranslationMode ? "Enabled" : "Disabled")}");
+            MyLogger.LogInfo($"Local Translation Mode: {(UseLocalTranslationMode ? "Enabled" : "Disabled")}");
 
             SetRotationToLocalMode();
         }
 
 
-        if (!Input.GetKeyDown(ModConfig.setReference.Value) || LevelEditorCentral.input.inputLocked ||
+        if (!Input.GetKeyDown(ModConfig.SetReference.Value) || LevelEditorCentral.input.inputLocked ||
             LevelEditorCentral.gizmos.isGrabbing) return;
         if (LevelEditorCentral.selection.list.Count == 0)
         {
@@ -116,7 +116,7 @@ public class Plugin : BaseUnityPlugin
                 _referenceBlock = null;
                 UseLocalGridMode = false;
 
-                logger.LogInfo("Reference Block removed, local grid mode deactivated.");
+                MyLogger.LogInfo("Reference Block removed, local grid mode deactivated.");
             }
             else
             {
@@ -134,7 +134,7 @@ public class Plugin : BaseUnityPlugin
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
                 UseLocalGridMode = false;
-                logger.LogInfo("Reference Block removed, local grid mode deactivated.");
+                MyLogger.LogInfo("Reference Block removed, local grid mode deactivated.");
                 return;
             }
 
@@ -154,7 +154,7 @@ public class Plugin : BaseUnityPlugin
         ReferenceBlockObject.SetActive(true);
 
         PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5);
-        logger.LogInfo(
+        MyLogger.LogInfo(
             "Reference Block set, local translation mode activated");
     }
 
@@ -174,7 +174,7 @@ public class Plugin : BaseUnityPlugin
         }
         else if (!_referenceBlock && ReferenceBlockObject)
         {
-            logger.LogInfo("Reference block is null, destroying ReferenceBlockObject.");
+            MyLogger.LogInfo("Reference block is null, destroying ReferenceBlockObject.");
             Destroy(ReferenceBlockObject?.gameObject);
             ReferenceBlockObject = null;
         }
@@ -190,7 +190,7 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateReferenceBlockObject(Transform source)
     {
-        logger.LogInfo("Creating Reference Block Object...");
+        MyLogger.LogInfo("Creating Reference Block Object...");
 
         if (!ReferenceBlockObject) ReferenceBlockObject = CreateReferenceGizmo();
 
@@ -256,7 +256,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!LevelEditorCentral)
             {
-                logger.LogError("LEV_LevelEditorCentral not found in the Level Editor scene.");
+                MyLogger.LogError("LEV_LevelEditorCentral not found in the Level Editor scene.");
                 return;
             }
 
@@ -266,7 +266,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!_baseButton)
             {
-                logger.LogError("Base button for toggling global/local mode not found.");
+                MyLogger.LogError("Base button for toggling global/local mode not found.");
                 return;
             }
 
@@ -274,7 +274,7 @@ public class Plugin : BaseUnityPlugin
 
             if (!_rotateFlip)
             {
-                logger.LogError("LEV_RotateFlip component not found in Level Editor Central.");
+                MyLogger.LogError("LEV_RotateFlip component not found in Level Editor Central.");
                 return;
             }
 
@@ -282,7 +282,7 @@ public class Plugin : BaseUnityPlugin
                 "Level Editor Central/Canvas/GameView/Gizmo Mode (true)--------------/_Top Right/Global Rotation Label");
             if (!_baseLabel)
             {
-                logger.LogError("Base label for toggling global/local mode not found.");
+                MyLogger.LogError("Base label for toggling global/local mode not found.");
                 return;
             }
 
@@ -301,13 +301,12 @@ public class Plugin : BaseUnityPlugin
             CustomButton = null;
             ToggleLabel = null;
             MainCamera = null;
-
         }
     }
 
     private void CreateToggleLocalModeButton()
     {
-        logger.LogInfo("Creating Toggle Local Translation button...");
+        MyLogger.LogInfo("Creating Toggle Local Translation button...");
 
         if (!ToggleLocalTranslationButton)
             ToggleLocalTranslationButton = Instantiate(_baseButton, _baseButton.transform.parent);
@@ -319,7 +318,7 @@ public class Plugin : BaseUnityPlugin
 
         if (!_toggleLocalTranslationImage)
         {
-            logger.LogError("Global Rotation Toggle button image not found.");
+            MyLogger.LogError("Global Rotation Toggle button image not found.");
             return;
         }
 
@@ -332,7 +331,6 @@ public class Plugin : BaseUnityPlugin
             CustomButton.onClick = new UnityEvent(); // clears all listeners
             CustomButton.onClick.AddListener(() =>
             {
-
                 UseLocalTranslationMode = !UseLocalTranslationMode;
 
                 SetRotationToLocalMode();
@@ -364,14 +362,14 @@ public class Plugin : BaseUnityPlugin
 
         ToggleLabel.SetActive(false);
 
-        logger.LogInfo("Toggle Local Translation button created successfully.");
+        MyLogger.LogInfo("Toggle Local Translation button created successfully.");
     }
 
     internal void SetRotationToLocalMode()
     {
         if (!LevelEditorCentral)
         {
-            logger.LogError("LEV_LevelEditorCentral is not initialized.");
+            MyLogger.LogError("LEV_LevelEditorCentral is not initialized.");
             return;
         }
 
@@ -410,16 +408,12 @@ public class Plugin : BaseUnityPlugin
 
                 _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
 
-                logger.LogInfo("TranslationGizmos set to world mode.");
-            }
-            else
-            {
-                return; // Do not change rotation if gizmos are being grabbed
+                MyLogger.LogInfo("TranslationGizmos set to world mode.");
             }
         }
         else
         {
-            logger.LogWarning("TranslationGizmos not found");
+            MyLogger.LogWarning("TranslationGizmos not found");
         }
     }
 
@@ -435,17 +429,17 @@ public class Plugin : BaseUnityPlugin
 
 public class ModConfig : MonoBehaviour
 {
-    public static ConfigEntry<KeyCode> toggleMode;
-    public static ConfigEntry<KeyCode> setReference;
+    public static ConfigEntry<KeyCode> ToggleMode;
+    public static ConfigEntry<KeyCode> SetReference;
 
 
     // Constructor that takes a ConfigFile instance from the main class
     public static void Initialize(ConfigFile config)
     {
-        toggleMode = config.Bind("1. Keybinds", "1.1 Toggle Global/Local Translation", KeyCode.Keypad1,
+        ToggleMode = config.Bind("1. Keybinds", "1.1 Toggle Global/Local Translation", KeyCode.Keypad1,
             "Key to Toggle Global/Local translation");
 
-        setReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.Keypad2,
+        SetReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.Keypad2,
             "Key to set the reference block");
     }
 }

@@ -56,3 +56,4 @@ nunit-*.xml
 /.editorconfig
 /App.config
 /LocalTranslation.sln
+/Folder.DotSettings.user

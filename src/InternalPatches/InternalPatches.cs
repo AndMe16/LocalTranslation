@@ -20,7 +20,7 @@ internal class PatchSelectDragLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        Plugin.logger.LogInfo("SelectDrag called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("SelectDrag called in LEV_GizmoHandler.");
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
@@ -40,7 +40,7 @@ internal class PatchSelectRotateLocalTranslation
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
         if (!Plugin.Instance.IsModEnabled) return;
-        Plugin.logger.LogInfo("SelectRotate called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("SelectRotate called in LEV_GizmoHandler.");
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(false);
         Plugin.Instance.ToggleLabel.SetActive(false);
     }
@@ -58,7 +58,7 @@ internal class PatchResetRotationLocalRotation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
         {
-            Plugin.logger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
+            Plugin.MyLogger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
             Plugin.Instance.SetRotationToLocalMode();
         }
     }
@@ -76,7 +76,7 @@ internal class PatchGoOutOfGModeLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
         {
-            Plugin.logger.LogInfo("GoOutOfGMode called in LEV_GizmoHandler.");
+            Plugin.MyLogger.LogInfo("GoOutOfGMode called in LEV_GizmoHandler.");
             Plugin.Instance.SetRotationToLocalMode();
         }
     }
@@ -94,9 +94,9 @@ internal class PatchGizmoJustGotClickedLocalTranslation
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
         // Reset the last mouse position to the current mouse position
-        Plugin.logger.LogInfo("GizmoJustGotClicked called in LEV_GizmoHandler.");
-        PatchDragGizmoLocalTranslation.originPosition = null;
-        PatchDragGizmoLocalTranslation.initialDragOffset = null;
+        Plugin.MyLogger.LogInfo("GizmoJustGotClicked called in LEV_GizmoHandler.");
+        PatchDragGizmoLocalTranslation.OriginPosition = null;
+        PatchDragGizmoLocalTranslation.InitialDragOffset = null;
     }
 }
 
@@ -112,7 +112,7 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
 
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
-        Plugin.logger.LogInfo("GizmoJustGotReleased called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("GizmoJustGotReleased called in LEV_GizmoHandler.");
         PatchDragGizmoLocalTranslation.ClearOriginMarker();
     }
 }
@@ -125,8 +125,8 @@ internal class PatchDragGizmoLocalTranslation
 
     private const float SizeOnScreen = 0.08f;
     private const float MaxReferenceSize = 10f;
-    internal static Vector3? initialDragOffset;
-    internal static Vector3? originPosition;
+    internal static Vector3? InitialDragOffset;
+    internal static Vector3? OriginPosition;
     private static DragPlane? _dragPlane;
     private static bool _gotSnapped;
     private static List<float> _gridValues = [];
@@ -150,7 +150,7 @@ internal class PatchDragGizmoLocalTranslation
         var currentGizmo = __instance.currentGizmo;
         if (!currentGizmo)
         {
-            Plugin.logger.LogWarning("No current gizmo found during DragGizmo call.");
+            Plugin.MyLogger.LogWarning("No current gizmo found during DragGizmo call.");
             return false;
         }
 
@@ -158,7 +158,7 @@ internal class PatchDragGizmoLocalTranslation
 
         if (!selection)
         {
-            Plugin.logger.LogWarning("No selection found during DragGizmo call.");
+            Plugin.MyLogger.LogWarning("No selection found during DragGizmo call.");
             return false;
         }
 
@@ -166,7 +166,7 @@ internal class PatchDragGizmoLocalTranslation
 
         if (selectionList.Count == 0)
         {
-            Plugin.logger.LogWarning("No objects selected for local translation.");
+            Plugin.MyLogger.LogWarning("No objects selected for local translation.");
             return false;
         }
 
@@ -182,16 +182,16 @@ internal class PatchDragGizmoLocalTranslation
         // var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.rotationGizmos.transform;
         var rotationGizmo = Plugin.Instance.LevelEditorCentral?.gizmos?.translationGizmos.transform;
 
-        if (!originPosition.HasValue)
+        if (!OriginPosition.HasValue)
             if (motherGizmo)
             {
-                Plugin.logger.LogInfo($"Origin position not set, using motherGizmo position: {motherGizmo.position}");
+                Plugin.MyLogger.LogInfo($"Origin position not set, using motherGizmo position: {motherGizmo.position}");
 
-                originPosition = motherGizmo.position;
-                if (originPosition != null)
+                OriginPosition = motherGizmo.position;
+                if (OriginPosition != null)
                 {
                     // Spawn the visual indicator
-                    CreateOriginMarker(originPosition.Value);
+                    CreateOriginMarker(OriginPosition.Value);
 
                     _dragPlane = GetPlaneFromGizmo(motherGizmo, rotationGizmo, mouseRay, gizmoName);
 
@@ -200,9 +200,12 @@ internal class PatchDragGizmoLocalTranslation
             }
 
         // Size of the marker
-        var dist = Vector3.Distance(Plugin.Instance.MainCamera.transform.position, originPosition.Value);
-        var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
-        _originMarker.transform.localScale = Vector3.one * uniformScale;
+        if (OriginPosition != null)
+        {
+            var dist = Vector3.Distance(Plugin.Instance.MainCamera.transform.position, OriginPosition.Value);
+            var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
+            _originMarker.transform.localScale = Vector3.one * uniformScale;
+        }
 
 
         if (_dragPlane == null) return false;
@@ -212,14 +215,14 @@ internal class PatchDragGizmoLocalTranslation
         var hitPoint = mouseRay.GetPoint(enter);
 
         // On initial click, store offset between pivot and where mouse hit the plane
-        if (!initialDragOffset.HasValue)
+        if (!InitialDragOffset.HasValue)
         {
             //Plugin.logger.LogInfo($"Initial drag offset not set, calculating from hit point: {hitPoint}");
-            if (originPosition != null) initialDragOffset = hitPoint - originPosition.Value;
+            if (OriginPosition != null) InitialDragOffset = hitPoint - OriginPosition.Value;
             return false;
         }
 
-        var localOffset = hitPoint - initialDragOffset.Value;
+        var localOffset = hitPoint - InitialDragOffset.Value;
 
         var snappedMove = Vector3.zero;
 
@@ -233,7 +236,7 @@ internal class PatchDragGizmoLocalTranslation
 
             if (axis == null)
             {
-                Plugin.logger.LogWarning($"Gizmo {gizmoName} does not have a valid translation vector.");
+                Plugin.MyLogger.LogWarning($"Gizmo {gizmoName} does not have a valid translation vector.");
                 return false;
             }
 
@@ -241,9 +244,9 @@ internal class PatchDragGizmoLocalTranslation
 
             var closestPoint = Vector3.Project(localOffset, axis.Value);
 
-            if (originPosition != null)
+            if (OriginPosition != null)
             {
-                var moveDir = closestPoint - originPosition.Value;
+                var moveDir = closestPoint - OriginPosition.Value;
 
                 var distance = Vector3.Dot(moveDir, axis.Value);
                 var snappedDistance = gridStep > 0f ? Mathf.Round(distance / gridStep) * gridStep : distance;
@@ -261,9 +264,9 @@ internal class PatchDragGizmoLocalTranslation
         {
             Vector3[] axes = [_dragPlane.Value.Axis1.normalized, _dragPlane.Value.Axis2.normalized];
 
-            if (originPosition != null)
+            if (OriginPosition != null)
             {
-                var rawMove = localOffset - originPosition.Value;
+                var rawMove = localOffset - OriginPosition.Value;
 
                 for (var i = 0; i < axes.Length; i++)
                 {
@@ -290,12 +293,12 @@ internal class PatchDragGizmoLocalTranslation
         }
 
         // Apply movement
-        foreach (var obj in selectionList.Where(_ => originPosition != null))
-            if (originPosition != null)
-                obj.transform.position = originPosition.Value + snappedMove +
+        foreach (var obj in selectionList.Where(_ => OriginPosition != null))
+            if (OriginPosition != null)
+                obj.transform.position = OriginPosition.Value + snappedMove +
                                          (obj.transform.position - __instance.motherGizmo.position);
 
-        if (originPosition != null) __instance.motherGizmo.position = originPosition.Value + snappedMove;
+        if (OriginPosition != null) __instance.motherGizmo.position = OriginPosition.Value + snappedMove;
 
         __instance.central.validation.BreakLock(false, null, "Gizmo11", false);
 
@@ -312,7 +315,7 @@ internal class PatchDragGizmoLocalTranslation
 
     private static void CreateOriginMarker(Vector3 position)
     {
-        Plugin.logger.LogInfo($"Creating origin marker at position: {position}");
+        Plugin.MyLogger.LogInfo($"Creating origin marker at position: {position}");
 
         if (_originMarker) Object.Destroy(_originMarker);
 
@@ -352,8 +355,8 @@ internal class PatchDragGizmoLocalTranslation
             _originMarker = null;
         }
 
-        originPosition = null;
-        initialDragOffset = null;
+        OriginPosition = null;
+        InitialDragOffset = null;
     }
 
 
@@ -399,7 +402,7 @@ internal class PatchDragGizmoLocalTranslation
                 axis = rotationGizmo.forward;
                 break;
             default:
-                Plugin.logger.LogWarning($"Unknown gizmo name: {name}");
+                Plugin.MyLogger.LogWarning($"Unknown gizmo name: {name}");
                 return null;
         }
 
@@ -412,7 +415,7 @@ internal class PatchDragGizmoLocalTranslation
         var planeNormal = Vector3.Cross(axis, toObject.normalized).normalized;
         if (planeNormal == Vector3.zero)
         {
-            Plugin.logger.LogWarning($"Plane normal is zero for gizmo {name}. Cannot create drag plane.");
+            Plugin.MyLogger.LogWarning($"Plane normal is zero for gizmo {name}. Cannot create drag plane.");
             return null;
         }
 
@@ -572,8 +575,8 @@ public static class PatchSetMotherPositionLocalTranslation
         //Plugin.logger.LogInfo("SetMotherPosition called in LEV_GizmoHandler.");
 
         // Reset the last mouse position to the current mouse position
-        PatchDragGizmoLocalTranslation.originPosition = null;
-        PatchDragGizmoLocalTranslation.initialDragOffset = null;
+        PatchDragGizmoLocalTranslation.OriginPosition = null;
+        PatchDragGizmoLocalTranslation.InitialDragOffset = null;
 
         // Set the translation gizmos to local mode
         Plugin.Instance.SetRotationToLocalMode();
@@ -588,11 +591,10 @@ public static class PatchSnapToGridXZLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
-
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
-        Plugin.logger.LogInfo("SnapToGridXZ called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("SnapToGridXZ called in LEV_GizmoHandler.");
 
         return LocalGridSnapUtils.SnapToLocalGrid(__instance, true, false);
     }
@@ -606,11 +608,10 @@ public static class PatchSnapToGridYLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
-
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
-        Plugin.logger.LogInfo("SnapToGridY called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("SnapToGridY called in LEV_GizmoHandler.");
 
         return LocalGridSnapUtils.SnapToLocalGrid(__instance, false, true);
     }
@@ -624,11 +625,10 @@ public static class PatchResetRotationLocalTranslation
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
     {
-
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
-        Plugin.logger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
 
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
@@ -636,7 +636,7 @@ public static class PatchResetRotationLocalTranslation
 
         if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
         {
-            Plugin.logger.LogWarning("No blocks selected or reference transform not set, skipping ResetRotation.");
+            Plugin.MyLogger.LogWarning("No blocks selected or reference transform not set, skipping ResetRotation.");
             return true;
         }
 
@@ -647,14 +647,18 @@ public static class PatchResetRotationLocalTranslation
         // Match rotation to the selected block
         // Perform rotation
         var currentRotation = selectedList[^1].transform.rotation;
-        var targetRotation = referenceTransform.rotation;
-        var deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
+        if (referenceTransform != null)
+        {
+            var targetRotation = referenceTransform.rotation;
+            var deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
 
-        // Convert quaternion delta to axis + angle
-        deltaRotation.ToAngleAxis(out var angle, out var axis);
+            // Convert quaternion delta to axis + angle
+            deltaRotation.ToAngleAxis(out var angle, out var axis);
 
-        __instance.central.rotflip.RotateBlocks(axis, angle, selectedList[^1].transform.position);
-        __instance.central.gizmos.ResetRotationGizmoRotation();
+            __instance.central.rotflip.RotateBlocks(axis, angle, selectedList[^1].transform.position);
+            __instance.central.gizmos.ResetRotationGizmoRotation();
+        }
+
 
         var after = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertBlockListToJSONList(selectedList);
         var selectionStr = Plugin.Instance.LevelEditorCentral.undoRedo.ConvertSelectionToStringList(selectedList);
@@ -675,17 +679,16 @@ public static class LocalGridSnapUtils
     // ReSharper disable once InconsistentNaming
     public static bool SnapToLocalGrid(LEV_GizmoHandler __instance, bool snapXZ, bool snapY)
     {
-
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
 
         if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
         {
-            Plugin.logger.LogWarning("No blocks selected or reference transform not set, skipping SnapToLocalGrid.");
+            Plugin.MyLogger.LogWarning("No blocks selected or reference transform not set, skipping SnapToLocalGrid.");
             return true;
         }
 
-        Plugin.logger.LogInfo("SnapToLocalGrid called in LEV_GizmoHandler.");
+        Plugin.MyLogger.LogInfo("SnapToLocalGrid called in LEV_GizmoHandler.");
 
         var refTransform = Plugin.Instance.ReferenceBlockObject.transform;
 
@@ -811,7 +814,7 @@ public static class PatchGrabGizmoLocalTranslation
 
             __instance.newGizmo = false;
 
-            Plugin.logger.LogInfo(
+            Plugin.MyLogger.LogInfo(
                 $"Local translation initialized with reference block: {referenceTransform.name} " +
                 $"at position {referenceTransform.position} with rotation {referenceTransform.rotation}");
         }
@@ -914,11 +917,12 @@ public static class PatchGizmoHandlerUpdateLocalTranslation
 internal class PatchRotateBlocks2ParamLocalTranslation
 {
     // ReSharper disable once UnusedMember.Local
+    // ReSharper disable once UnusedParameter.Local
     private static void Prefix(ref Vector3 upVector, float angle)
     {
         if (!Plugin.Instance.LevelEditorCentral)
         {
-            Plugin.logger.LogWarning("LevelEditorCentral.Instance is null in RotateBlocks prefix.");
+            Plugin.MyLogger.LogWarning("LevelEditorCentral.Instance is null in RotateBlocks prefix.");
             return;
         }
 
@@ -928,7 +932,7 @@ internal class PatchRotateBlocks2ParamLocalTranslation
         if (Plugin.Instance.LevelEditorCentral.selection.list.Count <= 0) return;
         // Modify the upVector
         upVector = Plugin.Instance.LevelEditorCentral.selection.list[^1].transform.up;
-        Plugin.logger.LogInfo(
+        Plugin.MyLogger.LogInfo(
             $"RotateBlocks called in local translation mode.");
     }
 
