@@ -121,7 +121,7 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DragGizmo")]
 internal class PatchDragGizmoLocalTranslation
 {
-    private const float MaxDistance = 1500f;
+    private const float MaxDistance = 2000f;
 
     private const float SizeOnScreen = 0.08f;
     private const float MaxReferenceSize = 10f;
