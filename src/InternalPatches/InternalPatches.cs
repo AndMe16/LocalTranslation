@@ -217,7 +217,7 @@ internal class PatchDragGizmoLocalTranslation
         {
             if (!isTooFar)
             {
-                PlayerManager.Instance.messenger.Log("Mouse ray too far from gizmo plane, skipping drag.", 2f);
+                PlayerManager.Instance.messenger.Log("The gizmo is too far!", 2f);
                 isTooFar = true;
             }
             return false;
@@ -524,9 +524,9 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
                 RestoreGizmoMaterial(__instance.Zgizmo);
             }
 
-                // Calculate a view direction in a local gizmo space
-                var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
-                                    gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
+            // Calculate a view direction in a local gizmo space
+            var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
+                                gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
 
             // Thresholds
             const float axisDotThreshold = 0.98f; // the axis disappears if the view is almost parallel to the axis
