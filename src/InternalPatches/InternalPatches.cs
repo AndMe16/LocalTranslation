@@ -485,6 +485,10 @@ public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
 public static class PatchDisableGizmosOnDistanceLocalTranslation
 {
     private const float MaxDistance = 2500f;
+    private static readonly Material GrayMaterial = new(Shader.Find("Standard"))
+    {
+        color = new Color(0.2f, 0.2f, 0.2f, 1f)
+    };
 
     [UsedImplicitly]
     // ReSharper disable once InconsistentNaming
@@ -501,18 +505,28 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
 
             if (cam_gizmo_dist > MaxDistance)
             {
-                // Gray out gizmos
-                __instance.Xgizmo.renderdude.material.color = Color.gray;
-                __instance.Ygizmo.renderdude.material.color = Color.gray;
-                __instance.Zgizmo.renderdude.material.color = Color.gray;
-                __instance.XYgizmo.renderdude.material.color = Color.gray;
-                __instance.YZgizmo.renderdude.material.color = Color.gray;
-                __instance.XZgizmo.renderdude.material.color = Color.gray;
+                //// Gray out gizmos
+                GrayOutGizmo(__instance.XZgizmo);
+                GrayOutGizmo(__instance.YZgizmo);
+                GrayOutGizmo(__instance.XYgizmo);
+                GrayOutGizmo(__instance.Xgizmo);
+                GrayOutGizmo(__instance.Ygizmo);
+                GrayOutGizmo(__instance.Zgizmo);
             }
 
-            // Calculate a view direction in a local gizmo space
-            var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
-                                gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
+            else
+            {
+                RestoreGizmoMaterial(__instance.XZgizmo);
+                RestoreGizmoMaterial(__instance.YZgizmo);
+                RestoreGizmoMaterial(__instance.XYgizmo);
+                RestoreGizmoMaterial(__instance.Xgizmo);
+                RestoreGizmoMaterial(__instance.Ygizmo);
+                RestoreGizmoMaterial(__instance.Zgizmo);
+            }
+
+                // Calculate a view direction in a local gizmo space
+                var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
+                                    gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
 
             // Thresholds
             const float axisDotThreshold = 0.98f; // the axis disappears if the view is almost parallel to the axis
@@ -540,6 +554,18 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
         __instance.DisableOrNotIndividualGizmo(__instance.RZgizmo, __instance.RZdist);
 
         return false; // skip original method
+    }
+
+    private static void GrayOutGizmo(LEV_SingleGizmo gizmo)
+    {
+        if (!gizmo) return;
+        gizmo.renderdude.material = GrayMaterial;
+    }
+
+    private static void RestoreGizmoMaterial(LEV_SingleGizmo gizmo)
+    {
+        if (!gizmo) return;
+        gizmo.renderdude.material = gizmo.original;
     }
 
     private static void SetGizmoActive(LEV_SingleGizmo gizmo, bool active)
