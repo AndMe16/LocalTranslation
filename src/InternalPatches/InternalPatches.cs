@@ -131,6 +131,7 @@ internal class PatchDragGizmoLocalTranslation
     private static bool _gotSnapped;
     private static List<float> _gridValues = [];
     private static Vector3? _lastSnappedPosition;
+    private static bool isTooFar = false;
 
     private static readonly List<string> PlaneNames = ["xy", "yz", "xz"];
     private static readonly List<string> AxisNames = ["x", "y", "z"];
@@ -209,7 +210,19 @@ internal class PatchDragGizmoLocalTranslation
 
         if (_dragPlane == null) return false;
 
-        if (!_dragPlane.Value.Plane.Raycast(mouseRay, out var enter) || !(enter <= MaxDistance)) return false;
+        if (!_dragPlane.Value.Plane.Raycast(mouseRay, out var enter)) return false;
+
+        if (!(enter <= MaxDistance))
+        {
+            if (!isTooFar)
+            {
+                PlayerManager.Instance.messenger.Log("Mouse ray too far from gizmo plane, skipping drag.", 2f);
+                isTooFar = true;
+            }
+            return false;
+        }
+
+        isTooFar = false;
 
         var hitPoint = mouseRay.GetPoint(enter);
 
