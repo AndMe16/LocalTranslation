@@ -484,6 +484,8 @@ public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DisableGizmosOnDistance")]
 public static class PatchDisableGizmosOnDistanceLocalTranslation
 {
+    private const float MaxDistance = 2500f;
+
     [UsedImplicitly]
     // ReSharper disable once InconsistentNaming
     private static bool Prefix(LEV_GizmoHandler __instance)
@@ -494,6 +496,19 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
         {
             var camTransform = Plugin.Instance.MainCamera.transform;
             var gizmoRoot = __instance.translationGizmos.transform;
+
+            float cam_gizmo_dist = Vector3.Distance(camTransform.transform.position, gizmoRoot.position);
+
+            if (cam_gizmo_dist > MaxDistance)
+            {
+                // Gray out gizmos
+                __instance.Xgizmo.renderdude.material.color = Color.gray;
+                __instance.Ygizmo.renderdude.material.color = Color.gray;
+                __instance.Zgizmo.renderdude.material.color = Color.gray;
+                __instance.XYgizmo.renderdude.material.color = Color.gray;
+                __instance.YZgizmo.renderdude.material.color = Color.gray;
+                __instance.XZgizmo.renderdude.material.color = Color.gray;
+            }
 
             // Calculate a view direction in a local gizmo space
             var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
@@ -515,6 +530,8 @@ public static class PatchDisableGizmosOnDistanceLocalTranslation
                 Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) > planeDotThreshold); // X normal
             SetGizmoActive(__instance.XZgizmo,
                 Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) > planeDotThreshold); // Y normal
+
+
         }
 
         // Keep rotation gizmo logic as-is, based on an original distance system
