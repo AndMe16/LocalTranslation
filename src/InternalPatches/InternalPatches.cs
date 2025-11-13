@@ -212,6 +212,7 @@ internal class PatchDragGizmoLocalTranslation
 
         if (!_dragPlane.Value.Plane.Raycast(mouseRay, out var enter)) return false;
 
+        // Gizmo too far
         if (!(enter <= MaxDistance))
         {
             if (!isTooFar)
@@ -369,6 +370,7 @@ internal class PatchDragGizmoLocalTranslation
 
         OriginPosition = null;
         InitialDragOffset = null;
+        isTooFar = false;
     }
 
 
