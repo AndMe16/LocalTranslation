@@ -375,45 +375,58 @@ public class Plugin : BaseUnityPlugin
 
         // Get the translation gizmos from the LevelEditorCentral
         var translationGizmos = LevelEditorCentral.gizmos.translationGizmos;
-        if (translationGizmos)
+
+        if (translationGizmos == null)
         {
-            // Set gizmo rotation based on local mode
-            if (UseLocalTranslationMode && !LevelEditorCentral.gizmos.isGrabbing)
-            {
-                var selectionList = LevelEditorCentral.selection.list;
-                switch (selectionList.Count)
-                {
-                    // logger.LogWarning("No objects selected for local translation mode.");
-                    case 0:
-                        return;
-                    case > 1:
-                        // logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
-                        break;
-                }
-
-                // Get the last selected object's transform
-                var selectedTransform = selectionList[^1].transform;
-                // Set gizmos to local mode based on the selected object's transform
-                translationGizmos.transform.localRotation =
-                    selectedTransform.rotation; // Use the selected object's rotation
-
-                _toggleLocalTranslationImage.sprite = _sprites["Pivot_LastSelected"];
-
-                //logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
-            }
-            else if (!LevelEditorCentral.gizmos.isGrabbing)
-            {
-                // Set gizmos to world mode
-                translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0); // Reset rotation to world space
-
-                _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
-
-                MyLogger.LogInfo("TranslationGizmos set to world mode.");
-            }
+            MyLogger.LogWarning("TranslationGizmos is null.");
+            return;
         }
-        else
+
+        if (translationGizmos.transform == null)
         {
-            MyLogger.LogWarning("TranslationGizmos not found");
+            MyLogger.LogWarning("TranslationGizmos has no transform.");
+            return;
+        }
+
+        // Set gizmo rotation based on local mode
+        if (UseLocalTranslationMode && !LevelEditorCentral.gizmos.isGrabbing)
+        {
+            var selectionList = LevelEditorCentral.selection.list;
+            switch (selectionList.Count)
+            {
+                // logger.LogWarning("No objects selected for local translation mode.");
+                case 0:
+                    return;
+                case > 1:
+                    // logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
+                    break;
+            }
+
+            var validSelection = selectionList.Where(o => o != null).ToList();
+            if (validSelection.Count == 0)
+            {
+                MyLogger.LogWarning("Selection list contains only null entries.");
+                return;
+            }
+
+            // Get the last selected object's transform
+            var selectedTransform = validSelection[^1].transform;
+            // Set gizmos to local mode based on the selected object's transform
+            translationGizmos.transform.localRotation =
+                selectedTransform.rotation; // Use the selected object's rotation
+
+            _toggleLocalTranslationImage.sprite = _sprites["Pivot_LastSelected"];
+
+            //logger.LogInfo("TranslationGizmos set to local mode based on selected object.");
+        }
+        else if (!LevelEditorCentral.gizmos.isGrabbing)
+        {
+            // Set gizmos to world mode
+            translationGizmos.transform.localRotation = Quaternion.Euler(0, 0, 0); // Reset rotation to world space
+
+            _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
+
+            MyLogger.LogInfo("TranslationGizmos set to world mode.");
         }
     }
 
