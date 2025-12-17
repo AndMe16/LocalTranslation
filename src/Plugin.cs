@@ -392,14 +392,9 @@ public class Plugin : BaseUnityPlugin
         if (UseLocalTranslationMode && !LevelEditorCentral.gizmos.isGrabbing)
         {
             var selectionList = LevelEditorCentral.selection.list;
-            switch (selectionList.Count)
+            if (selectionList.Count == 0)
             {
-                // logger.LogWarning("No objects selected for local translation mode.");
-                case 0:
-                    return;
-                case > 1:
-                    // logger.LogWarning("Multiple objects selected, local translation mode may not work as expected.");
-                    break;
+                return;
             }
 
             var validSelection = selectionList.Where(o => o != null).ToList();

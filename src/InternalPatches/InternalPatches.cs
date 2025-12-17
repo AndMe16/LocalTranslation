@@ -809,11 +809,17 @@ public static class PatchGrabGizmoLocalTranslation
 
         // Safety check
         if (!Plugin.Instance.ReferenceBlockObject)
+        {
+            Plugin.MyLogger.LogInfo("Reference block object not set, skipping to original method");
             return true;
+        }
+            
 
         if (__instance.central.selection.list.Count == 0)
+        {
+            Plugin.MyLogger.LogWarning("No blocks selected for local translation, skipping to original method, blame the game code in case of error :)");
             return true;
-
+        }
         var lastSelectionPosition = __instance.central.selection.list[^1].transform.position;
 
         // Get the reference transform
@@ -924,13 +930,27 @@ public static class PatchGrabGizmoLocalTranslation
 
         _lastAxisPoint = _lastAxisPoint.Value + snappedMove;
 
+        __instance.newBlockHeight = __instance.central.selection.list[^1].transform.position.y;
+
         return false;
     }
 
     // ReSharper disable once InconsistentNaming
     private static float SetYGridStep(LEV_GizmoHandler __instance)
     {
-        var yGridStep = __instance.gridY == 0f ? __instance.list_gridY[^1] : __instance.gridY;
+        var yGridStep = 0.1f;
+        if (__instance.gridY == 0f)
+        {
+            if(__instance.list_gridY.Count != 0)
+            {
+                yGridStep = Mathf.Max(__instance.list_gridY[^1],0.1f);
+            }   
+        }
+        else
+        {
+            yGridStep = __instance.gridY;
+        }
+
 
         if (__instance.central.input.GizmoGridVertical.positiveButtonDown && !__instance.central.input.inputLocked)
             return yGridStep;
