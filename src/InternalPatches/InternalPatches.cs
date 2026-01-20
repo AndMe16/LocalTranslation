@@ -117,6 +117,104 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
     }
 }
 
+// LEV_GizmoHandler_ResetRotationGizmoRotation
+// Safeguard against null references caused by other mods / vanilla bugs
+[HarmonyPatch(typeof(LEV_GizmoHandler), "ResetRotationGizmoRotation")]
+internal class PatchResetRotationGizmoRotationLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static bool Prefix(LEV_GizmoHandler __instance)
+    {
+
+        if (__instance.rotationGizmos == null)
+        {
+            Plugin.MyLogger.LogWarning(
+                "ResetRotationGizmoRotation called but rotationGizmos is NULL — skipping"
+            );
+            return false;
+        }
+
+        if (__instance.central?.selection?.list?.Count > 0)
+        {
+            for (int i = 0; i < __instance.central.selection.list.Count; i++)
+            {
+                if (__instance.central.selection.list[i] == null)
+                {
+                    Plugin.MyLogger.LogWarning(
+                        $"Selection[{i}] is NULL — skipping ResetRotationGizmoRotation"
+                    );
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+
+// BlockProperties_ConvertBlockToJSON_v15
+// Safeguard against null references caused by other mods / vanilla bugs
+[HarmonyPatch(typeof(BlockProperties), "ConvertBlockToJSON_v15")]
+internal class PatchConvertBlockToJSON_v15LocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static bool Prefix(BlockProperties __instance)
+    {
+        // Destroyed or missing block
+        if (__instance == null)
+            return false;
+
+        // Unity-style null (destroyed but not C# null)
+        if (!__instance)
+            return false;
+
+        // GameObject or transform already gone
+        if (__instance.transform == null)
+            return false;
+
+        return true;
+    }
+}
+
+
+// LEV_GizmoHandler_ScaleGizmo
+// Safeguard against null references caused by other mods / vanilla bugs
+[HarmonyPatch(typeof(LEV_GizmoHandler),"ScaleGizmo")]
+internal static class PatchScaleGizmoLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static bool Prefix(LEV_GizmoHandler __instance)
+    {
+        // Camera guards (mirror vanilla intent)
+        if (__instance.central?.cam?.cameraTransform == null)
+            return false;
+
+        if (__instance.central.cam.cameraCamera == null)
+            return false;
+
+        // Mother gizmo must exist AND not be destroyed
+        if (__instance.motherGizmo == null || !__instance.motherGizmo)
+            return false;
+
+        var list = __instance.central.selection?.list;
+        if (list == null || list.Count == 0)
+            return false;
+
+        // Any destroyed selection object will crash vanilla
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (list[i] == null || !list[i])
+                return false;
+        }
+
+        return true;
+    }
+}
+
+
 // LEV_GizmoHandler_DragGizmo
 [HarmonyPatch(typeof(LEV_GizmoHandler), "DragGizmo")]
 internal class PatchDragGizmoLocalTranslation

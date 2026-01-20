@@ -127,8 +127,15 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
+        var last = LevelEditorCentral.selection.list[^1];
+
         if (_referenceBlock)
-            if (LevelEditorCentral.selection.list[^1].transform == _referenceBlock)
+        {
+            
+            if (last == null || !last)
+                return;
+
+            if (last.transform == _referenceBlock)
             {
                 PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5);
                 Destroy(ReferenceBlockObject);
@@ -137,6 +144,8 @@ public class Plugin : BaseUnityPlugin
                 MyLogger.LogInfo("Reference Block removed, local grid mode deactivated.");
                 return;
             }
+        }
+           
 
         if (!UseLocalTranslationMode)
         {
@@ -146,7 +155,11 @@ public class Plugin : BaseUnityPlugin
 
         UseLocalGridMode = true;
 
-        _referenceBlock = LevelEditorCentral.selection.list[^1].transform;
+        if (last != null && last)
+        {
+            _referenceBlock = last.transform;
+        }
+        
 
         if (!ReferenceBlockObject)
             CreateReferenceBlockObject(_referenceBlock);
