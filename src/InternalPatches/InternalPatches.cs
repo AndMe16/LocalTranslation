@@ -1,9 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using FMODSyntax;
+﻿using FMODSyntax;
 using HarmonyLib;
 using JetBrains.Annotations;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -813,7 +814,14 @@ public static class PatchResetRotationLocalTranslation
             // Convert quaternion delta to axis + angle
             deltaRotation.ToAngleAxis(out var angle, out var axis);
 
-            __instance.central.rotflip.RotateBlocks(axis, angle, selectedList[^1].transform.position);
+            if (__instance.central.input.MultiSelect.buttonHeld)
+                angle = -angle; // Invert rotation due to multi-select flipping logic
+
+            var currentSelection = selectedList[^1];
+
+            Vector3 lastSelectedPivot = currentSelection.transform.position + currentSelection.transform.TransformVector(currentSelection.rotationPivot);
+
+            __instance.central.rotflip.RotateBlocks(axis, angle, lastSelectedPivot);
             __instance.central.gizmos.ResetRotationGizmoRotation();
         }
 
@@ -970,6 +978,9 @@ public static class PatchGrabGizmoLocalTranslation
 
             // Convert quaternion delta to axis + angle
             deltaRotation.ToAngleAxis(out var angle, out var axis);
+
+            if (__instance.central.input.MultiSelect.buttonHeld)
+                angle = -angle; // Invert rotation due to multi-select flipping logic
 
             __instance.central.rotflip.RotateBlocks(axis, angle,
                 __instance.central.selection.list[^1].transform.position);
