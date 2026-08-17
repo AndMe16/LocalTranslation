@@ -17,7 +17,7 @@ namespace LocalTranslation;
 
 // will be replaced by assemblyName if desired
 [BepInPlugin("andme123.localtranslation", "LocalTranslation", MyPluginInfo.PLUGIN_VERSION)]
-[BepInDependency("com.metalted.zeepkist.blueprintsX", BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency("com.metalted.zeepkist.toolkist", BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BaseUnityPlugin
 {
     // Only patch the LevelEditor2 scene
@@ -69,8 +69,8 @@ public class Plugin : BaseUnityPlugin
                 _harmony.PatchAll(type);
 
 
-        // Conditionally patch BPX
-        TryPatchBpx();
+        // Conditionally patch Toolkit if it is present
+        TryPatchToolkit();
 
         MyLogger.LogInfo("Plugin andme123.localtranslation is loaded!");
 
@@ -438,12 +438,21 @@ public class Plugin : BaseUnityPlugin
         }
     }
 
-    private void TryPatchBpx()
+    private void TryPatchToolkit()
     {
-        var bpxType = AccessTools.TypeByName("BPX.BPXUtils");
-        if (bpxType == null) return;
-        var method = AccessTools.Method(bpxType, "ConvertLocalToWorldVectors");
-        var prefix = new HarmonyMethod(typeof(PatchConvertLocalToWorldVectorsLocalTranslation).GetMethod("Prefix"));
+        var toolkitType = AccessTools.TypeByName("Toolkist.ToolkitUtils");
+        if (toolkitType == null)
+            return;
+
+        var method = AccessTools.Method(toolkitType, "ConvertLocalToWorldVectors");
+        if (method == null)
+            return;
+
+        var prefix = new HarmonyMethod(
+            typeof(PatchConvertLocalToWorldVectorsLocalTranslation)
+                .GetMethod("Prefix")
+        );
+
         _harmony.Patch(method, prefix);
     }
 }
