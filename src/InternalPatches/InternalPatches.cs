@@ -316,7 +316,7 @@ internal class PatchDragGizmoLocalTranslation
         {
             if (!isTooFar)
             {
-                PlayerManager.Instance.messenger.Log("The gizmo is too far!", 2f);
+                PlayerManager.Instance.messenger.Log("The gizmo is too far!", 2f, false);
                 isTooFar = true;
             }
             return false;

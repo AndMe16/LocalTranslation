@@ -111,7 +111,7 @@ public class Plugin : BaseUnityPlugin
         {
             if (ReferenceBlockObject)
             {
-                PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5);
+                PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5, false);
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
                 UseLocalGridMode = false;
@@ -137,7 +137,7 @@ public class Plugin : BaseUnityPlugin
 
             if (last.transform == _referenceBlock)
             {
-                PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5);
+                PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5, false);
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
                 UseLocalGridMode = false;
@@ -166,7 +166,7 @@ public class Plugin : BaseUnityPlugin
 
         ReferenceBlockObject.SetActive(true);
 
-        PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5);
+        PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5, false);
         MyLogger.LogInfo(
             "Reference Block set, local translation mode activated");
     }
