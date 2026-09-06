@@ -2,6 +2,8 @@
 
 namespace LocalTranslation.ExternalPatches;
 
+
+// Toolkist patch to override the local-to-world vector conversion to always return world-aligned axes when local translation mode is enabled.
 public static class PatchConvertLocalToWorldVectorsLocalTranslation
 {
     // ReSharper disable once InconsistentNaming
