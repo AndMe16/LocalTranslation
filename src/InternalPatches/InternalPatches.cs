@@ -752,18 +752,26 @@ public static class PatchResetRotationLocalTranslation
 public static class LocalGridSnapUtils
 {
     // ReSharper disable once InconsistentNaming
-    public static bool SnapToLocalGrid(LEV_GizmoHandler __instance, bool snapXZ, bool snapY)
+    public static bool SnapToLocalGrid(LEV_GizmoHandler __instance, bool snapXZ, bool snapY,
+        bool allowWhileGrabbing = false)
     {
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
 
-        if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
+        if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject ||
+            (__instance.isGrabbing && !allowWhileGrabbing))
+
         {
             Plugin.MyLogger.LogInfo("No blocks selected or reference transform not set, skipping SnapToLocalGrid patch");
             return true;
         }
 
         var refTransform = Plugin.Instance.ReferenceBlockObject.transform;
+
+        if (__instance.gridXZ == 0f && snapXZ && allowWhileGrabbing)
+        {
+            return true;
+        }
 
         var gridXZ = __instance.gridXZ != 0f ? __instance.gridXZ : __instance.list_gridXZ[^1];
         var gridY = __instance.gridY != 0f ? __instance.gridY : __instance.list_gridY[^1];
@@ -1178,10 +1186,31 @@ public static class PatchCycleGridXZLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        if (Plugin.Instance.UseLocalTranslationMode && __instance.isGrabbing)
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled && __instance.isGrabbing)
         {
-            // Snap the block that's being placed to the local grid
+            // CycleGridXZ moves a newly placed block on the grid established when placement began.
+            // Re-snap its current position in reference-block space so it follows the local grid instead.
+            LocalGridSnapUtils.SnapToLocalGrid(__instance, true, false, allowWhileGrabbing: true);
         }
 
+    }
+}
+
+// LEV_GizmoHandler_CycleGridY 1Params (int forcedIndex)
+[HarmonyPatch(typeof(LEV_GizmoHandler), "CycleGridY")]
+[HarmonyPatch([typeof(int)])]
+public static class PatchCycleGridYLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_GizmoHandler __instance)
+    {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled && __instance.isGrabbing)
+        {
+            // CycleGridY moves a newly placed block on the grid established when placement began.
+            // Re-snap its current position in reference-block space so it follows the local grid instead.
+            LocalGridSnapUtils.SnapToLocalGrid(__instance, false, true, allowWhileGrabbing: true);
+        }
     }
 }

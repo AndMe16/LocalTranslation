@@ -219,7 +219,6 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateReferenceBlockObject(Transform source)
     {
-        MyLogger.LogInfo("Creating Reference Block Object at position: " + source.position + " and rotation: " + source.rotation);
 
         // If the ReferenceBlockObject doesn't exist, create it
         if (!ReferenceBlockObject) ReferenceBlockObject = CreateReferenceGizmo();
@@ -339,7 +338,6 @@ public class Plugin : BaseUnityPlugin
 
     private void CreateToggleLocalModeButton()
     {
-        MyLogger.LogInfo("Creating Toggle Local Translation button...");
 
         if (!ToggleLocalTranslationButton)
             ToggleLocalTranslationButton = Instantiate(_baseButton, _baseButton.transform.parent);
