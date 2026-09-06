@@ -454,7 +454,6 @@ public class Plugin : BaseUnityPlugin
 
             _toggleLocalTranslationImage.sprite = _sprites["Pivot_Average"];
 
-            MyLogger.LogInfo("TranslationGizmos set to world mode.");
         }
     }
 

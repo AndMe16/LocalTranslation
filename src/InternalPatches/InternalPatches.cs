@@ -12,6 +12,7 @@ using Object = UnityEngine.Object;
 namespace LocalTranslation.InternalPatches;
 
 // LEV_GizmoHandler_SelectDrag
+// Happens when the user uses the translation tool
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SelectDrag")]
 internal class PatchSelectDragLocalTranslation
 {
@@ -21,8 +22,7 @@ internal class PatchSelectDragLocalTranslation
     {
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
-        Plugin.MyLogger.LogInfo("SelectDrag called in LEV_GizmoHandler.");
-
+        // Uses local translation gizmo if local translation mode is enabled and the mod is active
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
             Plugin.Instance.SetRotationToLocalMode();
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(true);
@@ -31,6 +31,7 @@ internal class PatchSelectDragLocalTranslation
 }
 
 // LEV_GizmoHandler_SelectRotate
+// Happens when the user uses the rotation tool
 [HarmonyPatch(typeof(LEV_GizmoHandler), "SelectRotate")]
 internal class PatchSelectRotateLocalTranslation
 {
@@ -41,7 +42,6 @@ internal class PatchSelectRotateLocalTranslation
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
         if (!Plugin.Instance.IsModEnabled) return;
-        Plugin.MyLogger.LogInfo("SelectRotate called in LEV_GizmoHandler.");
         Plugin.Instance.ToggleLocalTranslationButton.SetActive(false);
         Plugin.Instance.ToggleLabel.SetActive(false);
     }
@@ -59,13 +59,13 @@ internal class PatchResetRotationLocalRotation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
         {
-            Plugin.MyLogger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
             Plugin.Instance.SetRotationToLocalMode();
         }
     }
 }
 
 // LEV_GizmoHandler_GoOutOfGMode
+// Happens when the user gets out of the placing blocks mode (G mode) and goes back to normal editing mode
 [HarmonyPatch(typeof(LEV_GizmoHandler), "GoOutOfGMode")]
 internal class PatchGoOutOfGModeLocalTranslation
 {
@@ -77,7 +77,6 @@ internal class PatchGoOutOfGModeLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
         {
-            Plugin.MyLogger.LogInfo("GoOutOfGMode called in LEV_GizmoHandler.");
             Plugin.Instance.SetRotationToLocalMode();
         }
     }
@@ -94,8 +93,7 @@ internal class PatchGizmoJustGotClickedLocalTranslation
         if (__instance is null) throw new ArgumentNullException(nameof(__instance));
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
-        // Reset the last mouse position to the current mouse position
-        Plugin.MyLogger.LogInfo("GizmoJustGotClicked called in LEV_GizmoHandler.");
+        // Reset the last mouse position
         PatchDragGizmoLocalTranslation.OriginPosition = null;
         PatchDragGizmoLocalTranslation.InitialDragOffset = null;
     }
@@ -113,7 +111,6 @@ internal class PatchGizmoJustGotReleasedLocalTranslation
 
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
-        Plugin.MyLogger.LogInfo("GizmoJustGotReleased called in LEV_GizmoHandler.");
         PatchDragGizmoLocalTranslation.ClearOriginMarker();
     }
 }
@@ -165,15 +162,24 @@ internal class PatchConvertBlockToJSON_v15LocalTranslation
     {
         // Destroyed or missing block
         if (__instance == null)
+        {
+            Plugin.MyLogger.LogWarning("ConvertBlockToJSON_v15 called but BlockProperties instance is NULL — skipping");
             return false;
+        }
 
         // Unity-style null (destroyed but not C# null)
         if (!__instance)
+        {
+            Plugin.MyLogger.LogWarning("ConvertBlockToJSON_v15 called but BlockProperties instance is destroyed — skipping");
             return false;
+        }
 
         // GameObject or transform already gone
         if (__instance.transform == null)
+        {
+            Plugin.MyLogger.LogWarning("ConvertBlockToJSON_v15 called but BlockProperties.transform is NULL — skipping");
             return false;
+        }
 
         return true;
     }
@@ -191,24 +197,39 @@ internal static class PatchScaleGizmoLocalTranslation
     {
         // Camera guards (mirror vanilla intent)
         if (__instance.central?.cam?.cameraTransform == null)
+        {
+            Plugin.MyLogger.LogWarning("ScaleGizmo called but cameraTransform is NULL — skipping");
             return false;
+        }
 
         if (__instance.central.cam.cameraCamera == null)
+        {
+            Plugin.MyLogger.LogWarning("ScaleGizmo called but cameraCamera is NULL — skipping");
             return false;
+        }
 
         // Mother gizmo must exist AND not be destroyed
         if (__instance.motherGizmo == null || !__instance.motherGizmo)
+        {
+            Plugin.MyLogger.LogWarning("ScaleGizmo called but motherGizmo is NULL or destroyed — skipping");
             return false;
+        }
 
         var list = __instance.central.selection?.list;
         if (list == null || list.Count == 0)
+        {
+            Plugin.MyLogger.LogWarning("ScaleGizmo called but selection list is NULL or empty — skipping");
             return false;
+        }
 
         // Any destroyed selection object will crash vanilla
         for (int i = 0; i < list.Count; i++)
         {
             if (list[i] == null || !list[i])
+            {
+                Plugin.MyLogger.LogWarning("ScaleGizmo called but selection object is NULL or destroyed — skipping");
                 return false;
+            }
         }
 
         return true;
@@ -284,7 +305,6 @@ internal class PatchDragGizmoLocalTranslation
         if (!OriginPosition.HasValue)
             if (motherGizmo)
             {
-                Plugin.MyLogger.LogInfo($"Origin position not set, using motherGizmo position: {motherGizmo.position}");
 
                 OriginPosition = motherGizmo.position;
                 if (OriginPosition != null)
@@ -329,7 +349,6 @@ internal class PatchDragGizmoLocalTranslation
         // On initial click, store offset between pivot and where mouse hit the plane
         if (!InitialDragOffset.HasValue)
         {
-            //Plugin.logger.LogInfo($"Initial drag offset not set, calculating from hit point: {hitPoint}");
             if (OriginPosition != null) InitialDragOffset = hitPoint - OriginPosition.Value;
             return false;
         }
@@ -420,6 +439,8 @@ internal class PatchDragGizmoLocalTranslation
         if (_gotSnapped && (!_lastSnappedPosition.HasValue ||
                             Vector3.Distance(__instance.motherGizmo.position, _lastSnappedPosition.Value) >=
                             minNonZero)) AudioEvents.MenuHover1.Play();
+
+        // Update last snapped position
         _lastSnappedPosition = __instance.motherGizmo.position;
 
         return false;
@@ -589,7 +610,6 @@ public static class PatchSetToDefaultColorLocalTranslation
     {
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return;
 
-        // Only apply the warning logic to the specific button you care about
         if (__instance != Plugin.Instance.CustomButton)
             return;
 
@@ -627,8 +647,6 @@ public static class PatchSetMotherPositionLocalTranslation
 
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled || __instance.isDragging) return;
 
-        //Plugin.logger.LogInfo("SetMotherPosition called in LEV_GizmoHandler.");
-
         // Reset the last mouse position to the current mouse position
         PatchDragGizmoLocalTranslation.OriginPosition = null;
         PatchDragGizmoLocalTranslation.InitialDragOffset = null;
@@ -649,8 +667,6 @@ public static class PatchSnapToGridXZLocalTranslation
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
-        Plugin.MyLogger.LogInfo("SnapToGridXZ called in LEV_GizmoHandler.");
-
         return LocalGridSnapUtils.SnapToLocalGrid(__instance, true, false);
     }
 }
@@ -665,8 +681,6 @@ public static class PatchSnapToGridYLocalTranslation
     {
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
-
-        Plugin.MyLogger.LogInfo("SnapToGridY called in LEV_GizmoHandler.");
 
         return LocalGridSnapUtils.SnapToLocalGrid(__instance, false, true);
     }
@@ -683,15 +697,13 @@ public static class PatchResetRotationLocalTranslation
         if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
             return true;
 
-        Plugin.MyLogger.LogInfo("ResetRotation called in LEV_GizmoHandler.");
-
         var selection = Plugin.Instance.LevelEditorCentral.selection;
         var selectedList = selection.list;
 
 
         if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
         {
-            Plugin.MyLogger.LogWarning("No blocks selected or reference transform not set, skipping ResetRotation.");
+            Plugin.MyLogger.LogInfo("No blocks selected or reference transform not set, skipping ResetRotation patch");
             return true;
         }
 
@@ -747,11 +759,9 @@ public static class LocalGridSnapUtils
 
         if (selectedList.Count == 0 || !Plugin.Instance.ReferenceBlockObject || __instance.isGrabbing)
         {
-            Plugin.MyLogger.LogWarning("No blocks selected or reference transform not set, skipping SnapToLocalGrid.");
+            Plugin.MyLogger.LogInfo("No blocks selected or reference transform not set, skipping SnapToLocalGrid patch");
             return true;
         }
-
-        Plugin.MyLogger.LogInfo("SnapToLocalGrid called in LEV_GizmoHandler.");
 
         var refTransform = Plugin.Instance.ReferenceBlockObject.transform;
 
@@ -789,6 +799,7 @@ public static class LocalGridSnapUtils
             "Gizmo_LocalSnap"
         );
 
+        Plugin.MyLogger.LogInfo($"Snapped to local grid: {snappedWorldPos}, delta applied: {delta}");
 
         return false;
     }
@@ -1018,8 +1029,6 @@ internal class PatchRotateBlocks2ParamLocalTranslation
         if (Plugin.Instance.LevelEditorCentral.selection.list.Count <= 0) return;
         // Modify the upVector
         upVector = Plugin.Instance.LevelEditorCentral.selection.list[^1].transform.up;
-        Plugin.MyLogger.LogInfo(
-            $"RotateBlocks called in local translation mode.");
     }
 
     // ReSharper disable once InconsistentNaming
