@@ -104,9 +104,11 @@ public class Plugin : BaseUnityPlugin
             SetRotationToLocalMode();
         }
 
-
+        // Check if the user has set a reference block
         if (!Input.GetKeyDown(ModConfig.SetReference.Value) || LevelEditorCentral.input.inputLocked ||
             LevelEditorCentral.gizmos.isGrabbing) return;
+
+        // If no blocks are selected, remove the reference block and deactivate local grid mode
         if (LevelEditorCentral.selection.list.Count == 0)
         {
             if (ReferenceBlockObject)
@@ -127,14 +129,16 @@ public class Plugin : BaseUnityPlugin
             return;
         }
 
+        // Get the last selected block as the reference block
         var last = LevelEditorCentral.selection.list[^1];
 
         if (_referenceBlock)
         {
-            
+            // If the last selected block is null or not valid, do nothing
             if (last == null || !last)
                 return;
 
+            // If the last selected block is the same as the current reference block, remove it
             if (last.transform == _referenceBlock)
             {
                 PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5, false);
@@ -145,8 +149,8 @@ public class Plugin : BaseUnityPlugin
                 return;
             }
         }
-           
 
+        // If the last selected block is valid, set it as the reference block and activate local translation mode
         if (!UseLocalTranslationMode)
         {
             UseLocalTranslationMode = true;
@@ -157,10 +161,11 @@ public class Plugin : BaseUnityPlugin
 
         if (last != null && last)
         {
+            // Set the last selected block as the reference block
             _referenceBlock = last.transform;
         }
-        
 
+        // If the ReferenceBlockObject doesn't exist, create it
         if (!ReferenceBlockObject)
             CreateReferenceBlockObject(_referenceBlock);
 
@@ -185,6 +190,8 @@ public class Plugin : BaseUnityPlugin
             var uniformScale = Mathf.Min(dist * SizeOnScreen, MaxReferenceSize);
             ReferenceBlockObject.transform.localScale = Vector3.one * uniformScale;
         }
+
+        // If the reference block is null but the ReferenceBlockObject exists, destroy it
         else if (!_referenceBlock && ReferenceBlockObject)
         {
             MyLogger.LogInfo("Reference block is null, destroying ReferenceBlockObject.");
