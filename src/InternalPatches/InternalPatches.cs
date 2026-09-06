@@ -823,7 +823,6 @@ public static class PatchGrabGizmoLocalTranslation
         // Safety check
         if (!Plugin.Instance.ReferenceBlockObject)
         {
-            Plugin.MyLogger.LogInfo("Reference block object not set, skipping to original method");
             return true;
         }
             
