@@ -1166,3 +1166,22 @@ public static class PatchDisableOrNotIndividualGizmoLocalTranslation
         }
     }
 }
+
+// LEV_GizmoHandler_CycleGridXZ 2Params (int forcedIndex, string source)
+[HarmonyPatch(typeof(LEV_GizmoHandler), "CycleGridXZ")]
+[HarmonyPatch([typeof(int), typeof(string)])]
+public static class PatchCycleGridXZLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_GizmoHandler __instance)
+    {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+
+        if (Plugin.Instance.UseLocalTranslationMode && __instance.isGrabbing)
+        {
+            // Snap the block that's being placed to the local grid
+        }
+
+    }
+}
