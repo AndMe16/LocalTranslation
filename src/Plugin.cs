@@ -204,14 +204,24 @@ public class Plugin : BaseUnityPlugin
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
 
+        // Destroy the reference block object if it exists
+        if (ReferenceBlockObject)
+        {
+            MyLogger.LogInfo("Destroying ReferenceBlockObject...");
+            Destroy(ReferenceBlockObject);
+            ReferenceBlockObject = null;
+        }
+
+        // Unpatch all Harmony patches
         _harmony?.UnpatchSelf();
         _harmony = null;
     }
 
     private void CreateReferenceBlockObject(Transform source)
     {
-        MyLogger.LogInfo("Creating Reference Block Object...");
+        MyLogger.LogInfo("Creating Reference Block Object at position: " + source.position + " and rotation: " + source.rotation);
 
+        // If the ReferenceBlockObject doesn't exist, create it
         if (!ReferenceBlockObject) ReferenceBlockObject = CreateReferenceGizmo();
 
         ReferenceBlockObject.transform.position = source.position;
@@ -280,6 +290,9 @@ public class Plugin : BaseUnityPlugin
                 return;
             }
 
+            // Create the button and label for toggling global/local translation mode
+
+            // Find the base button for toggling global/local mode
             _baseButton =
                 GameObject.Find(
                     "Level Editor Central/Canvas/GameView/Gizmo Mode (true)--------------/_Top Right/Global Rotation Toggle");
