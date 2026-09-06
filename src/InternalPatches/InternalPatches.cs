@@ -1,5 +1,6 @@
 ﻿using FMODSyntax;
 using HarmonyLib;
+using Imui.Style;
 using JetBrains.Annotations;
 using System;
 using System.Collections.Generic;
@@ -448,7 +449,6 @@ internal class PatchDragGizmoLocalTranslation
 
     private static void CreateOriginMarker(Vector3 position)
     {
-        Plugin.MyLogger.LogInfo($"Creating origin marker at position: {position}");
 
         if (_originMarker) Object.Destroy(_originMarker);
 
@@ -1052,5 +1052,117 @@ public static class PatchUpdateTransformLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled && !isRealTime && !resetOnly)
             Plugin.Instance.SetRotationToLocalMode();
+    }
+}
+
+// LEV_GizmoHandler_DisableOrNotIndividualGizmo
+[HarmonyPatch(typeof(LEV_GizmoHandler), "DisableOrNotIndividualGizmo")]
+public static class PatchDisableOrNotIndividualGizmoLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static bool Prefix(LEV_GizmoHandler __instance, LEV_SingleGizmo giz)
+    {
+        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled)
+            return true;
+
+        if (Camera.main == null || __instance.motherGizmo == null)
+        {
+            return true;
+        }
+
+        if (giz == null)
+        {
+            return true;
+        }
+
+        if (giz.name.Contains("R"))
+        {
+            return true;
+        }
+
+        if (!(giz.name.Contains("X") || giz.name.Contains("Y") || giz.name.Contains("Z")))
+        {
+            return true;
+        }
+
+
+        Vector3 cameraOffset =
+            Camera.main.transform.position - __instance.translationGizmos.transform.position;
+
+
+        if (giz == __instance.Xgizmo || giz == __instance.Ygizmo || giz == __instance.Zgizmo) { 
+            float alignment = 0f;
+
+            if (giz == __instance.Xgizmo)
+            {
+                alignment = Mathf.Abs(Vector3.Dot(cameraOffset.normalized, __instance.translationGizmos.transform.right));
+            }
+            else if (giz == __instance.Ygizmo)
+            {
+                alignment = Mathf.Abs(Vector3.Dot(cameraOffset.normalized, __instance.translationGizmos.transform.up));
+            }
+            else if (giz == __instance.Zgizmo)
+            {
+                alignment = Mathf.Abs(Vector3.Dot(cameraOffset.normalized, __instance.translationGizmos.transform.forward));
+            }
+
+            if (alignment > 0.999f)
+            {
+                giz.gameObject.SetActive(false);
+            }
+
+            else
+            {
+                giz.gameObject.SetActive(true);
+            }
+            return false; // Skip original method
+        }
+
+        else if (giz == __instance.XYgizmo || giz == __instance.YZgizmo || giz == __instance.XZgizmo)
+        {
+
+            float distance = 1f;
+
+            if (giz == __instance.XYgizmo)
+            {
+                // XY plane → Z normal
+                distance = Mathf.Abs(Vector3.Dot(
+                    cameraOffset.normalized,
+                    __instance.translationGizmos.transform.forward
+                ));
+            }
+            else if (giz == __instance.YZgizmo)
+            {
+                // YZ plane → X normal
+                distance = Mathf.Abs(Vector3.Dot(
+                    cameraOffset.normalized,
+                    __instance.translationGizmos.transform.right
+                ));
+            }
+            else if (giz == __instance.XZgizmo)
+            {
+                // XZ plane → Y normal
+                distance = Mathf.Abs(Vector3.Dot(
+                    cameraOffset.normalized,
+                    __instance.translationGizmos.transform.up
+                ));
+            }
+
+            if (distance < 0.01f)
+            {
+                giz.gameObject.SetActive(false);
+            }
+            else
+            {
+                giz.gameObject.SetActive(true);
+            }
+            return false; // Skip original method
+        }
+
+        else
+        {
+            return true;
+        }
     }
 }
