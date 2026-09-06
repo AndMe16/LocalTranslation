@@ -22,8 +22,8 @@ public class Plugin : BaseUnityPlugin
 {
     // Only patch the LevelEditor2 scene
     private const string TargetSceneName = "LevelEditor2";
-    private const float MaxReferenceSize = 4f; // maximum size of the reference block in world units
-    private const float SizeOnScreen = 0.15f; // world‐units per unit of distance 
+    private const float MaxReferenceSize = 2f; // maximum size of the reference block in world units
+    private const float SizeOnScreen = 0.1f; // world‐units per unit of distance 
     internal static ManualLogSource MyLogger;
     internal static readonly Color NormalColor = new(1f, 0.572549f, 0f, 1f);
     internal static readonly Color WarningColor = new(0.988f, 0.27f, 0f, 1f); // light red
