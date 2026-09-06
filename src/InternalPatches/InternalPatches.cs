@@ -316,7 +316,7 @@ internal class PatchDragGizmoLocalTranslation
         {
             if (!isTooFar)
             {
-                PlayerManager.Instance.messenger.Log("The gizmo is too far!", 2f, false);
+                PlayerManager.Instance.messenger.Log("The object is too far!", 2f, false);
                 isTooFar = true;
             }
             return false;
@@ -576,110 +576,6 @@ public class PatchLevMotherGizmoFlipperUpdateLocalTranslation
         );
 
         return false; // Skip original Update logic
-    }
-}
-
-// LEV_GizmoHandler_DisableGizmosOnDistance
-[HarmonyPatch(typeof(LEV_GizmoHandler), "DisableGizmosOnDistance")]
-public static class PatchDisableGizmosOnDistanceLocalTranslation
-{
-    private const float MaxDistance = 2500f;
-    private static readonly Material GrayMaterial = new(Shader.Find("Standard"))
-    {
-        color = new Color(0.2f, 0.2f, 0.2f, 1f)
-    };
-
-    [UsedImplicitly]
-    // ReSharper disable once InconsistentNaming
-    private static bool Prefix(LEV_GizmoHandler __instance)
-    {
-        if (!Plugin.Instance.UseLocalTranslationMode || !Plugin.Instance.IsModEnabled) return true;
-
-        if (Plugin.Instance.MainCamera)
-        {
-            var camTransform = Plugin.Instance.MainCamera.transform;
-            var gizmoRoot = __instance.translationGizmos.transform;
-
-            float cam_gizmo_dist = Vector3.Distance(camTransform.transform.position, gizmoRoot.position);
-
-            if (cam_gizmo_dist > MaxDistance)
-            {
-                //// Gray out gizmos
-                GrayOutGizmo(__instance.XZgizmo);
-                GrayOutGizmo(__instance.YZgizmo);
-                GrayOutGizmo(__instance.XYgizmo);
-                GrayOutGizmo(__instance.Xgizmo);
-                GrayOutGizmo(__instance.Ygizmo);
-                GrayOutGizmo(__instance.Zgizmo);
-            }
-
-            else
-            {
-                RestoreGizmoMaterial(__instance.XZgizmo);
-                RestoreGizmoMaterial(__instance.YZgizmo);
-                RestoreGizmoMaterial(__instance.XYgizmo);
-                RestoreGizmoMaterial(__instance.Xgizmo);
-                RestoreGizmoMaterial(__instance.Ygizmo);
-                RestoreGizmoMaterial(__instance.Zgizmo);
-            }
-
-            // Calculate a view direction in a local gizmo space
-            var localViewDir = (gizmoRoot.InverseTransformPoint(camTransform.position) -
-                                gizmoRoot.InverseTransformPoint(gizmoRoot.position)).normalized;
-
-            // Thresholds
-            const float axisDotThreshold = 0.98f; // the axis disappears if the view is almost parallel to the axis
-            const float planeDotThreshold = 0.05f; // plane disappears if view is nearly perpendicular to the plane
-
-            // Axis gizmos: disable if the camera is looking *along* the axis
-            SetGizmoActive(__instance.Xgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) < axisDotThreshold);
-            SetGizmoActive(__instance.Ygizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) < axisDotThreshold);
-            SetGizmoActive(__instance.Zgizmo, Mathf.Abs(Vector3.Dot(localViewDir, Vector3.forward)) < axisDotThreshold);
-
-            // Plane gizmos: disable if the camera is looking *edge-on* to the plane (aligned with the plane's normal)
-            SetGizmoActive(__instance.XYgizmo,
-                Mathf.Abs(Vector3.Dot(localViewDir, Vector3.forward)) > planeDotThreshold); // Z normal
-            SetGizmoActive(__instance.YZgizmo,
-                Mathf.Abs(Vector3.Dot(localViewDir, Vector3.right)) > planeDotThreshold); // X normal
-            SetGizmoActive(__instance.XZgizmo,
-                Mathf.Abs(Vector3.Dot(localViewDir, Vector3.up)) > planeDotThreshold); // Y normal
-
-
-        }
-
-        // Keep rotation gizmo logic as-is, based on an original distance system
-        __instance.DisableOrNotIndividualGizmo(__instance.RXgizmo, __instance.RXdist);
-        __instance.DisableOrNotIndividualGizmo(__instance.RYgizmo, __instance.RYdist);
-        __instance.DisableOrNotIndividualGizmo(__instance.RZgizmo, __instance.RZdist);
-
-        return false; // skip original method
-    }
-
-    private static void GrayOutGizmo(LEV_SingleGizmo gizmo)
-    {
-        if (!gizmo) return;
-        gizmo.renderdude.material = GrayMaterial;
-    }
-
-    private static void RestoreGizmoMaterial(LEV_SingleGizmo gizmo)
-    {
-        if (!gizmo) return;
-        gizmo.renderdude.material = gizmo.original;
-    }
-
-    private static void SetGizmoActive(LEV_SingleGizmo gizmo, bool active)
-    {
-        if (!gizmo) return;
-
-        switch (active)
-        {
-            case true when !gizmo.gameObject.activeSelf:
-                gizmo.gameObject.SetActive(true);
-                break;
-            case false when gizmo.gameObject.activeSelf:
-                gizmo.gameObject.SetActive(false);
-                break;
-        }
     }
 }
 
