@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Imui.Style;
 using JetBrains.Annotations;
+using Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -835,12 +836,21 @@ public static class PatchGrabGizmoLocalTranslation
         }
             
 
-        if (__instance.central.selection.list.Count == 0)
+        var selectedBlock = __instance.central.selection.list.Count > 0
+            ? __instance.central.selection.list[^1]
+            : null;
+
+        if (selectedBlock == null)
         {
-            Plugin.MyLogger.LogWarning("No blocks selected for local translation, skipping to original method, blame the game code in case of error :)");
             return true;
         }
-        var lastSelectionPosition = __instance.central.selection.list[^1].transform.position;
+
+        var lastSelectionPosition = selectedBlock.transform.position;
+
+        if (IsInvalid(lastSelectionPosition))
+        {
+            return true;
+        }
 
         // Get the reference transform
         var referenceTransform = Plugin.Instance.ReferenceBlockObject.transform;
@@ -888,16 +898,28 @@ public static class PatchGrabGizmoLocalTranslation
             // Perform rotation
             var currentRotation = __instance.central.selection.list[^1].transform.rotation;
             var targetRotation = referenceTransform.rotation;
-            var deltaRotation = targetRotation * Quaternion.Inverse(currentRotation);
+            float rotationDifference = Quaternion.Angle(
+                currentRotation,
+                targetRotation);
 
-            // Convert quaternion delta to axis + angle
-            deltaRotation.ToAngleAxis(out var angle, out var axis);
+            if (rotationDifference > 0.001f)
+            {
+                var deltaRotation =
+                    targetRotation * Quaternion.Inverse(currentRotation);
 
-            if (__instance.central.input.MultiSelect.buttonHeld)
-                angle = -angle; // Invert rotation due to multi-select flipping logic
+                deltaRotation.ToAngleAxis(out var angle, out var axis);
 
-            __instance.central.rotflip.RotateBlocks(axis, angle,
-                __instance.central.selection.list[^1].transform.position);
+                if (axis.sqrMagnitude > 0.000001f && !(float.IsInfinity(axis.x) || float.IsInfinity(axis.y) || float.IsInfinity(axis.z)))
+                {
+                    if (__instance.central.input.MultiSelect.buttonHeld)
+                        angle = -angle;
+
+                    __instance.central.rotflip.RotateBlocks(
+                        axis.normalized,
+                        angle,
+                        __instance.central.selection.list[^1].transform.position);
+                }
+            }
             __instance.central.gizmos.ResetRotationGizmoRotation();
 
             _totalScrollOffset = Vector3.zero;
@@ -955,6 +977,17 @@ public static class PatchGrabGizmoLocalTranslation
 
         __instance.newBlockHeight = __instance.central.selection.list[^1].transform.position.y;
 
+        var newSelectedBlock = __instance.central.selection.list.Count > 0
+            ? __instance.central.selection.list[^1]
+            : null;
+
+        if (IsInvalid(newSelectedBlock.transform.position))
+        {
+            Plugin.MyLogger.LogError(
+                $"GrabGizmo END: translation resulted in invalid position! " +
+                $"Block={newSelectedBlock.name}, Position={newSelectedBlock.transform.position}");
+        }
+
         return false;
     }
 
@@ -982,6 +1015,13 @@ public static class PatchGrabGizmoLocalTranslation
             return -yGridStep;
 
         return 0f;
+    }
+
+    private static bool IsInvalid(Vector3 v)
+    {
+        var vector = v;
+        return float.IsNaN(vector.x) || float.IsNaN(vector.y) || float.IsNaN(vector.z) ||
+               float.IsInfinity(vector.x) || float.IsInfinity(vector.y) || float.IsInfinity(vector.z);
     }
 }
 
