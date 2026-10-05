@@ -50,6 +50,7 @@ public class Plugin : BaseUnityPlugin
     internal Camera MainCamera;
 
     internal GameObject ReferenceBlockObject;
+    internal string ReferenceBlockuid;
     internal GameObject ToggleLabel;
     internal GameObject ToggleLocalTranslationButton;
     internal bool UseLocalGridMode;
@@ -104,10 +105,31 @@ public class Plugin : BaseUnityPlugin
             SetRotationToLocalMode();
         }
 
+        // Check if the user has toggled the chain reference block option
+        if (Input.GetKeyDown(ModConfig.ToggleChainReference.Value) && !LevelEditorCentral.input.inputLocked)
+        {
+            ModConfig.ChainReferenceBlock.Value = !ModConfig.ChainReferenceBlock.Value;
+            PlayerManager.Instance.messenger.Log(
+                $"[LocTrans] Chain Reference Block: {(ModConfig.ChainReferenceBlock.Value ? "Enabled" : "Disabled")}",
+                5, false);
+            MyLogger.LogInfo(
+                $"Chain Reference Block: {(ModConfig.ChainReferenceBlock.Value ? "Enabled" : "Disabled")}");
+        }
+
         // Check if the user has set a reference block
         if (!Input.GetKeyDown(ModConfig.SetReference.Value) || LevelEditorCentral.input.inputLocked ||
             LevelEditorCentral.gizmos.isGrabbing) return;
 
+        if (SetReferenceBlock())
+        {
+            PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5, false);
+            MyLogger.LogInfo(
+                "Reference Block set, local translation mode activated");
+        }
+    }
+
+    internal bool SetReferenceBlock()
+    {
         // If no blocks are selected, remove the reference block and deactivate local grid mode
         if (LevelEditorCentral.selection.list.Count == 0)
         {
@@ -116,6 +138,7 @@ public class Plugin : BaseUnityPlugin
                 PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5, false);
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
+                ReferenceBlockuid = null;
                 UseLocalGridMode = false;
 
                 MyLogger.LogInfo("Reference Block removed, local grid mode deactivated.");
@@ -126,7 +149,7 @@ public class Plugin : BaseUnityPlugin
                     5, Color.black, new Color(1f, 0.98f, 0.29f, 0.9f));
             }
 
-            return;
+            return false;
         }
 
         // Get the last selected block as the reference block
@@ -136,7 +159,7 @@ public class Plugin : BaseUnityPlugin
         {
             // If the last selected block is null or not valid, do nothing
             if (last == null || !last)
-                return;
+                return false;
 
             // If the last selected block is the same as the current reference block, remove it
             if (last.transform == _referenceBlock)
@@ -144,9 +167,10 @@ public class Plugin : BaseUnityPlugin
                 PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block removed", 5, false);
                 Destroy(ReferenceBlockObject);
                 _referenceBlock = null;
+                ReferenceBlockuid = null;
                 UseLocalGridMode = false;
                 MyLogger.LogInfo("Reference Block removed, local grid mode deactivated.");
-                return;
+                return false;
             }
         }
 
@@ -163,6 +187,7 @@ public class Plugin : BaseUnityPlugin
         {
             // Set the last selected block as the reference block
             _referenceBlock = last.transform;
+            ReferenceBlockuid = last.UID;
         }
 
         // If the ReferenceBlockObject doesn't exist, create it
@@ -171,9 +196,24 @@ public class Plugin : BaseUnityPlugin
 
         ReferenceBlockObject.SetActive(true);
 
-        PlayerManager.Instance.messenger.Log("[LocTrans] Reference Block set, local translation mode activated", 5, false);
-        MyLogger.LogInfo(
-            "Reference Block set, local translation mode activated");
+        return true;
+    }
+
+    internal void SetReferenceTransformbyUID(string uid)
+    {
+        if (!LevelEditorCentral) return;
+        var block = LevelEditorCentral.selection.list.FirstOrDefault(b => b != null && b.UID == uid);
+        if (block != null)
+        {
+            _referenceBlock = block.transform;
+            ReferenceBlockuid = uid;
+        }
+        else
+        {
+            MyLogger.LogInfo($"No block found with UID: {uid}");
+            _referenceBlock = null;
+            ReferenceBlockuid = null;
+        }
     }
 
     private void LateUpdate()
@@ -478,6 +518,9 @@ public class ModConfig : MonoBehaviour
 {
     public static ConfigEntry<KeyCode> ToggleMode;
     public static ConfigEntry<KeyCode> SetReference;
+    public static ConfigEntry<KeyCode> ToggleChainReference;
+
+    public static ConfigEntry<bool> ChainReferenceBlock;
 
 
     // Constructor that takes a ConfigFile instance from the main class
@@ -488,5 +531,11 @@ public class ModConfig : MonoBehaviour
 
         SetReference = config.Bind("1. Keybinds", "1.2 Set Reference Block", KeyCode.Keypad2,
             "Key to set the reference block");
+
+        ToggleChainReference = config.Bind("1. Keybinds", "1.3 Toggle Chain Reference Block", KeyCode.None,
+            "Key to toggle chain reference block option");
+
+        ChainReferenceBlock = config.Bind("2. Options", "2.1 Chain Reference Block", false,
+            "If enabled, each new placed block will be the reference block");
     }
 }

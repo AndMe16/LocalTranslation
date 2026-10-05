@@ -79,6 +79,14 @@ internal class PatchGoOutOfGModeLocalTranslation
 
         if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled)
         {
+            if (ModConfig.ChainReferenceBlock.Value && Plugin.Instance.ReferenceBlockObject)
+            {
+                if (Plugin.Instance.SetReferenceBlock())
+                {
+                    Plugin.MyLogger.LogInfo(
+                "Reference Block chained");
+                }
+            }
             Plugin.Instance.SetRotationToLocalMode();
         }
     }
@@ -1251,6 +1259,29 @@ public static class PatchCycleGridYLocalTranslation
             // CycleGridY moves a newly placed block on the grid established when placement began.
             // Re-snap its current position in reference-block space so it follows the local grid instead.
             LocalGridSnapUtils.SnapToLocalGrid(__instance, false, true, allowWhileGrabbing: true);
+        }
+    }
+}
+
+// LEV_UndoRedo_ApplyBeforeOrAfterState
+[HarmonyPatch(typeof(LEV_UndoRedo), "ApplyBeforeOrAfterState")]
+public static class PatchApplyBeforeOrAfterStateLocalTranslation
+{
+    [UsedImplicitly]
+    // ReSharper disable once InconsistentNaming
+    private static void Postfix(LEV_UndoRedo __instance)
+    {
+        if (__instance is null) throw new ArgumentNullException(nameof(__instance));
+        if (Plugin.Instance.UseLocalTranslationMode && Plugin.Instance.IsModEnabled && Plugin.Instance.ReferenceBlockObject)
+        {
+            if (__instance.historyList[__instance.currentHistoryPosition].changeType == Change_Collection.ChangeType.block)
+            {
+                var changeList = __instance.historyList[__instance.currentHistoryPosition].changeList;
+                if (changeList.Any(c => c.GetUID() == Plugin.Instance.ReferenceBlockuid))
+                {
+                    Plugin.Instance.SetReferenceTransformbyUID(Plugin.Instance.ReferenceBlockuid);
+                }
+            }
         }
     }
 }
